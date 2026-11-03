@@ -1,0 +1,116 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { DateTime } from "luxon";
+import {
+  courseSchema,
+  taskSchema,
+  settingsSchema,
+  registrationSchema,
+} from "../src/lib/validation";
+import { localDeadline, dayKey, taskGroups } from "../src/lib/time";
+import type { Task } from "../src/lib/types";
+const task: Task = {
+  id: "x",
+  course_id: "7a6c61e0-9d80-41e3-bddc-6877f40d2207",
+  title: "Makalah",
+  description: "",
+  deadline_at: "2026-12-31T16:00:00Z",
+  status: "todo",
+  priority: "medium",
+};
+test("Course requires a nonblank name and positive integer credits", () => {
+  for (const credits of [0, -1, 1.5])
+    assert.equal(
+      courseSchema.safeParse({ name: "RPL", credits }).success,
+      false,
+    );
+  assert.equal(
+    courseSchema.safeParse({ name: " ", credits: 3 }).success,
+    false,
+  );
+  assert.equal(courseSchema.parse({ name: " RPL ", credits: 3 }).name, "RPL");
+});
+test("Task requires an owned-context identifier, deadline and valid enums", () => {
+  assert.equal(taskSchema.safeParse({ ...task, id: undefined }).success, false);
+  const { id, ...payload } = task;
+  assert.equal(taskSchema.safeParse(payload).success, true);
+  for (const change of [
+    { course_id: "" },
+    { title: " " },
+    { status: "unknown" },
+    { deadline_at: "demo" },
+    { priority: "urgent" },
+  ])
+    assert.equal(
+      taskSchema.safeParse({ ...payload, ...change }).success,
+      false,
+    );
+});
+test("Registration checks confirmation and minimum password", () => {
+  const base = {
+    name: "Tian",
+    email: "test@example.com",
+    password: "password1",
+    confirm: "password1",
+    timezone: "Asia/Makassar",
+  };
+  assert.equal(registrationSchema.safeParse(base).success, true);
+  assert.equal(
+    registrationSchema.safeParse({ ...base, confirm: "wrong" }).success,
+    false,
+  );
+  assert.equal(
+    registrationSchema.safeParse({ ...base, email: "bad" }).success,
+    false,
+  );
+});
+test("Settings rejects invalid timezone", () => {
+  assert.equal(
+    settingsSchema.safeParse({
+      name: "Tian",
+      timezone: "Not/AZone",
+      academic_module_enabled: true,
+    }).success,
+    false,
+  );
+});
+test("Local deadline converts Makassar time to UTC", () => {
+  assert.equal(
+    localDeadline("2026-11-03T23:59", "Asia/Makassar"),
+    "2026-11-03T15:59:00.000Z",
+  );
+});
+test("Year boundary follows the user zone", () => {
+  assert.equal(dayKey(task.deadline_at, "Asia/Makassar"), "2027-01-01");
+  assert.equal(dayKey(task.deadline_at, "America/New_York"), "2026-12-31");
+});
+test("Impossible date and DST missing/ambiguous hour are rejected", () => {
+  for (const [value, zone] of [
+    ["2026-02-30T12:00", "Asia/Makassar"],
+    ["2026-03-08T02:30", "America/New_York"],
+    ["2026-11-01T01:30", "America/New_York"],
+  ])
+    assert.throws(() => localDeadline(value, zone));
+  assert.ok(localDeadline("2026-11-01T03:00", "America/New_York"));
+});
+test("Dashboard excludes completed tasks and includes exactly next seven days", () => {
+  const now = DateTime.fromISO("2026-12-31T12:00", { zone: "Asia/Makassar" });
+  const items = [
+    { ...task, deadline_at: "2026-12-31T01:00:00Z" },
+    task,
+    { ...task, deadline_at: "2027-01-07T15:59:00Z" },
+    { ...task, deadline_at: "2027-01-07T16:00:00Z" },
+    { ...task, status: "done" as const },
+  ];
+  const groups = taskGroups(items, "Asia/Makassar", now);
+  assert.equal(groups.overdue.length, 1);
+  assert.equal(groups.today.length, 1);
+  assert.equal(groups.upcoming.length, 2);
+});
+test("Empty workspace has zero groups", () => {
+  const groups = taskGroups([], "Asia/Makassar");
+  assert.equal(
+    groups.today.length + groups.upcoming.length + groups.overdue.length,
+    0,
+  );
+});

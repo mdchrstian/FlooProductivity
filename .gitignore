@@ -1,0 +1,66 @@
+# Dependencies and generated builds
+node_modules/
+.next/
+/dist/
+/out/
+/coverage/
+*.tsbuildinfo
+
+# Environment, credentials, tokens, local QA accounts
+.env*
+!.env.example
+.test-accounts*.json
+.test-links*.json
+.ui-fixtures*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+.npmrc
+.secrets/
+secrets/
+credentials*.json
+service-account*.json
+*service-account*.json
+*database-backup*
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+
+# Machine-specific hosting, Supabase state, browser/test output
+/.openai/
+/.vercel/
+supabase/.temp/
+supabase/.branches/
+/playwright-report/
+/test-results/
+/blob-report/
+*.log
+*.har
+
+# Local academic documents, references, personal data and screenshots.
+# Keep only the hosted setup guide in the public repository.
+/docs/*
+!/docs/SETUP_SUPABASE_HOSTED.md
+/scripts/build_capstone.py
+/scripts/report_diagrams.py
+/scripts/update_capstone_index.py
+*.docx
+*.doc
+*.pdf
+*.bib
+*.ris
+*.enl
+*.bak
+*.tmp
+~$*
+
+# OS/editor local state
+.DS_Store
+.AppleDouble
+.LSOverride
+.idea/
+.vscode/
