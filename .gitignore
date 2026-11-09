@@ -64,3 +64,13 @@ supabase/.branches/
 .LSOverride
 .idea/
 .vscode/
+
+# Internal notes, QA tooling and the old prototype stay local
+/legacy/
+/VERIFICATION.md
+/DESIGN.md
+/scripts/check-ui.mjs
+/scripts/seed-ui-review.mjs
+/.claude/
+/AGENTS.md
+next-env.d.ts
