@@ -6,6 +6,7 @@ import {
   taskSchema,
   noteSchema,
   sessionSchema,
+  scheduleSchema,
   settingsSchema,
   registrationSchema,
 } from "../src/lib/validation";
@@ -143,4 +144,25 @@ test("Pomodoro session needs an integer duration of 1 to 180 minutes", () => {
     sessionSchema.safeParse({ duration_minutes: 25, user_id: "x" }).success,
     false,
   );
+});
+test("Schedule slot needs a valid weekday, HH:MM times and end after start", () => {
+  const course_id = "7a6c61e0-9d80-41e3-bddc-6877f40d2207";
+  const ok = {
+    course_id,
+    day_of_week: 3,
+    start_time: "08:00",
+    end_time: "09:40",
+  };
+  assert.equal(scheduleSchema.safeParse(ok).success, true);
+  for (const bad of [
+    { day_of_week: 0 },
+    { day_of_week: 8 },
+    { start_time: "8:00" },
+    { end_time: "24:00" },
+    { end_time: "08:00" },
+    { end_time: "07:00" },
+    { course_id: "x" },
+    { user_id: course_id },
+  ])
+    assert.equal(scheduleSchema.safeParse({ ...ok, ...bad }).success, false);
 });

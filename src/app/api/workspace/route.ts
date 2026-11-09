@@ -22,6 +22,11 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(200),
     db
+      .from("schedule_items")
+      .select("*")
+      .order("day_of_week")
+      .order("start_time"),
+    db
       .from("settings")
       .select("timezone,academic_module_enabled")
       .eq("user_id", user.id)
@@ -40,7 +45,8 @@ export async function GET() {
       tasks: results[2].data,
       notes: results[3].data,
       sessions: results[4].data,
-      settings: results[5].data,
+      schedule: results[5].data,
+      settings: results[6].data,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );

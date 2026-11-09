@@ -5,14 +5,20 @@ import {
   taskSchema,
   noteSchema,
   sessionSchema,
+  scheduleSchema,
   settingsSchema,
 } from "./validation";
 import { z } from "zod";
 export async function mutate(req: NextRequest, resource: string, id?: string) {
   if (
-    !["courses", "tasks", "notes", "pomodoro_sessions", "settings"].includes(
-      resource,
-    )
+    ![
+      "courses",
+      "tasks",
+      "notes",
+      "pomodoro_sessions",
+      "schedule_items",
+      "settings",
+    ].includes(resource)
   )
     return NextResponse.json({ error: "Tidak ditemukan." }, { status: 404 });
   const allowedOrigins = [
@@ -81,7 +87,9 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
           ? noteSchema
           : resource === "pomodoro_sessions"
             ? sessionSchema
-            : taskSchema;
+            : resource === "schedule_items"
+              ? scheduleSchema
+              : taskSchema;
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success)
       return NextResponse.json(

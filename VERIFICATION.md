@@ -65,3 +65,11 @@ Dijalankan: `tsc --noEmit`, `next build --webpack`, `npm test` (11 lulus), migra
 Uji browser (akun A, hosted): timer menghitung mundur dan tombol Hentikan muncul; saat waktu habis sesi tersimpan otomatis dan tampil di riwayat dengan total "Hari ini"; data bertahan setelah muat ulang; lebar 375 px tanpa overflow horizontal; hapus sesi lewat UI. Selesainya timer disimulasikan dengan memajukan `Date.now()` di halaman, bukan menunggu 25 menit nyata.
 
 Belum dijalankan: uji browser akun B, lebar desktop lebar, hentikan timer lalu pastikan tidak tercatat, timer saat tab latar belakang, hapus Course berisi sesi lewat UI. Tidak ada pengaturan `pomodoro_enabled`. Timer berhenti saat pindah halaman.
+
+## P1 Jadwal kelas (11 November 2026)
+
+Dijalankan: `tsc --noEmit`, `next build --webpack`, `npm test` (12 lulus), migrasi `202611110001_schedule.sql` pada proyek hosted, dan `npm run test:integration` (21 kasus lulus, termasuk INT-S1: isolasi dua akun, batas hari 1–7, jam selesai setelah jam mulai, penolakan Course/user_id akun lain, Course dihapus ikut menghapus slot).
+
+Uji browser (akun A, hosted): bagian "Jadwal kuliah" pada halaman Mata kuliah dengan keadaan kosong; tambah slot; validasi jam selesai sebelum jam mulai ditolak dengan pesan; slot Selasa 10.00–11.40 tersimpan dan muncul pada agenda Kalender 10 November 2026 (hari Selasa) serta tidak muncul pada hari Senin dan Rabu; dialog edit memuat nilai tersimpan; ubah hari ke Kamis tersimpan; hapus dengan konfirmasi; lebar 375 px tanpa overflow dan dialog muat (17–358 px). Data uji dihapus setelah pengecekan.
+
+Belum dijalankan: uji browser akun B, lebar desktop lebar, tampilan agenda dengan beberapa slot dan tugas sekaligus, hapus Course berisi slot lewat UI (hanya lewat uji integrasi), tampilan Kalender saat Modul Akademik disembunyikan. Tidak ada pemeriksaan slot yang tumpang tindih.

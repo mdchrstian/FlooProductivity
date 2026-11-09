@@ -28,6 +28,22 @@ export type PomodoroSession = {
   duration_minutes: number;
   created_at: string;
 };
+export type ScheduleItem = {
+  id: string;
+  course_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+export const weekdays = [
+  "Senin",
+  "Selasa",
+  "Rabu",
+  "Kamis",
+  "Jumat",
+  "Sabtu",
+  "Minggu",
+];
 export type Settings = { timezone: string; academic_module_enabled: boolean };
 export type Workspace = {
   userId: string;
@@ -36,6 +52,7 @@ export type Workspace = {
   tasks: Task[];
   notes: Note[];
   sessions: PomodoroSession[];
+  schedule: ScheduleItem[];
   settings: Settings;
 };
 export const statuses: Record<Status, string> = {

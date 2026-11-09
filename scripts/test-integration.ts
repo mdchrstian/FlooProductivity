@@ -427,6 +427,93 @@ await check(
     return "RLS menolak akses silang; durasi dibatasi; SET NULL mempertahankan sesi.";
   },
 );
+await check(
+  "INT-S1",
+  "Jadwal kuliah terisolasi dan ikut terhapus bersama Course",
+  async () => {
+    const c = (
+      await a
+        .from("courses")
+        .insert({ user_id: uidA, name: "Uji jadwal", credits: 1 })
+        .select()
+        .single()
+    ).data!.id;
+    const slot = await a
+      .from("schedule_items")
+      .insert({
+        user_id: uidA,
+        course_id: c,
+        day_of_week: 2,
+        start_time: "08:00",
+        end_time: "09:40",
+      })
+      .select()
+      .single();
+    assert.equal(slot.error, null);
+    assert.deepEqual(
+      (await b.from("schedule_items").select().eq("id", slot.data.id)).data,
+      [],
+    );
+    assert.deepEqual(
+      (
+        await b
+          .from("schedule_items")
+          .update({ day_of_week: 5 })
+          .eq("id", slot.data.id)
+          .select()
+      ).data,
+      [],
+    );
+    assert.deepEqual(
+      (await b.from("schedule_items").delete().eq("id", slot.data.id).select())
+        .data,
+      [],
+    );
+    const bad = {
+      user_id: uidA,
+      course_id: c,
+      day_of_week: 2,
+      start_time: "08:00",
+      end_time: "09:40",
+    };
+    assert.ok(
+      (await a.from("schedule_items").insert({ ...bad, day_of_week: 8 })).error,
+    );
+    assert.ok(
+      (await a.from("schedule_items").insert({ ...bad, end_time: "07:00" }))
+        .error,
+    );
+    assert.ok(
+      (await a.from("schedule_items").insert({ ...bad, user_id: uidB })).error,
+    );
+    assert.ok(
+      (await a.from("schedule_items").insert({ ...bad, course_id: cb })).error,
+    );
+    assert.ok(
+      (
+        await a
+          .from("schedule_items")
+          .update({ course_id: cb })
+          .eq("id", slot.data.id)
+          .select()
+      ).error,
+    );
+    assert.ok(
+      (
+        await a
+          .from("schedule_items")
+          .update({ user_id: uidB })
+          .eq("id", slot.data.id)
+      ).error,
+    );
+    assert.equal((await a.from("courses").delete().eq("id", c)).error, null);
+    assert.deepEqual(
+      (await a.from("schedule_items").select().eq("id", slot.data.id)).data,
+      [],
+    );
+    return "RLS menolak akses silang; batas hari/jam ditegakkan; CASCADE menghapus slot.";
+  },
+);
 await check("INT-13", "Course dengan Task tidak dapat dihapus", async () => {
   assert.equal(
     (await a.from("courses").delete().eq("id", ca)).error?.code,

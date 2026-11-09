@@ -43,6 +43,21 @@ export const sessionSchema = z
     course_id: z.uuid("Mata kuliah tidak valid.").nullable().default(null),
   })
   .strict();
+const clock = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Jam harus berformat HH:MM.");
+export const scheduleSchema = z
+  .object({
+    course_id: z.uuid("Pilih mata kuliah."),
+    day_of_week: z.number().int().min(1).max(7),
+    start_time: clock,
+    end_time: clock,
+  })
+  .strict()
+  .refine((v) => v.end_time > v.start_time, {
+    message: "Jam selesai harus setelah jam mulai.",
+    path: ["end_time"],
+  });
 export const settingsSchema = z
   .object({
     timezone: timezoneSchema,

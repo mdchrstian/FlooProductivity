@@ -10,6 +10,7 @@ import {
   taskSchema,
   noteSchema,
   sessionSchema,
+  scheduleSchema,
   settingsSchema,
 } from "@/lib/validation";
 import { localDeadline, formatDeadline, dayKey, taskGroups } from "@/lib/time";
@@ -19,6 +20,8 @@ import {
   type Course,
   type Task,
   type Note,
+  type ScheduleItem,
+  weekdays,
   type Workspace,
 } from "@/lib/types";
 
@@ -26,6 +29,7 @@ type Editor =
   | { kind: "course"; value?: Course }
   | { kind: "task"; value?: Task; courseId?: string }
   | { kind: "note"; value?: Note; courseId?: string }
+  | { kind: "schedule"; value?: ScheduleItem; courseId?: string }
   | null;
 type Store = {
   data: Workspace;
@@ -188,7 +192,22 @@ export default function WorkspaceShell({
                 s.course_id === id ? { ...s, course_id: null } : s,
               )
             : current.sessions;
-          return { ...current, courses, notes, sessions };
+          // Mirrors ON DELETE CASCADE for class slots.
+          const schedule = remove
+            ? current.schedule.filter((x) => x.course_id !== id)
+            : current.schedule;
+          return { ...current, courses, notes, sessions, schedule };
+        }
+        if (resource === "schedule_items") {
+          const byTime = (a: ScheduleItem, b: ScheduleItem) =>
+            a.day_of_week - b.day_of_week ||
+            a.start_time.localeCompare(b.start_time);
+          const schedule = remove
+            ? current.schedule.filter((x) => x.id !== id)
+            : id
+              ? current.schedule.map((x) => (x.id === id ? value : x))
+              : [...current.schedule, value];
+          return { ...current, schedule: schedule.sort(byTime) };
         }
         if (resource === "pomodoro_sessions") {
           const sessions = remove
@@ -1246,6 +1265,7 @@ function AcademicView() {
           </button>
         </Empty>
       )}
+      {course && <ScheduleSection course={course} />}
       {data.courses.length > 0 && (
         <>
           <div className="section-heading">
@@ -1566,6 +1586,51 @@ function FocusView() {
     </>
   );
 }
+function ScheduleSection({ course }: { course: Course }) {
+  const { data, edit } = useWorkspace(),
+    slots = data.schedule.filter((x) => x.course_id === course.id);
+  return (
+    <>
+      <div className="section-heading">
+        <h2>Jadwal kuliah</h2>
+        <button
+          className="secondary"
+          onClick={() => edit({ kind: "schedule", courseId: course.id })}
+        >
+          Tambah jadwal
+        </button>
+      </div>
+      {slots.length ? (
+        <div className="task-list">
+          {slots.map((x) => (
+            <div className="task-row" key={x.id}>
+              <span>
+                {weekdays[x.day_of_week - 1]} · {x.start_time.slice(0, 5)}–
+                {x.end_time.slice(0, 5)}
+              </span>
+              <button
+                className="text-button"
+                aria-label={
+                  "Edit jadwal " +
+                  weekdays[x.day_of_week - 1] +
+                  " " +
+                  course.name
+                }
+                onClick={() => edit({ kind: "schedule", value: x })}
+              >
+                Edit
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="muted small">
+          Belum ada jadwal. Tambahkan hari dan jam kuliah mingguan.
+        </p>
+      )}
+    </>
+  );
+}
 function CalendarView() {
   const { data, now, edit } = useWorkspace(),
     zone = data.settings.timezone;
@@ -1574,7 +1639,10 @@ function CalendarView() {
   const start = month.startOf("week"),
     tasks = data.tasks
       .filter((t) => dayKey(t.deadline_at, zone) === selected)
-      .sort((a, b) => a.deadline_at.localeCompare(b.deadline_at));
+      .sort((a, b) => a.deadline_at.localeCompare(b.deadline_at)),
+    classes = data.schedule.filter(
+      (x) => x.day_of_week === DateTime.fromISO(selected).weekday,
+    );
   if (!data.settings.academic_module_enabled)
     return (
       <>
@@ -1587,7 +1655,7 @@ function CalendarView() {
       <div className="page-heading">
         <div>
           <h1>Kalender</h1>
-          <p>Deadline semua mata kuliah, dalam waktu {zone}.</p>
+          <p>Deadline dan jadwal kuliah, dalam waktu {zone}.</p>
         </div>
         <button
           className="primary"
@@ -1728,12 +1796,28 @@ function CalendarView() {
             Agenda{" "}
             {DateTime.fromISO(selected).setLocale("id").toFormat("d LLLL yyyy")}
           </h2>
+          {classes.length > 0 && (
+            <>
+              <h3>Jadwal kuliah</h3>
+              <div className="task-list">
+                {classes.map((x) => (
+                  <div className="task-row" key={x.id}>
+                    <span>
+                      {x.start_time.slice(0, 5)}–{x.end_time.slice(0, 5)} ·{" "}
+                      {data.courses.find((c) => c.id === x.course_id)?.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <h3>Deadline</h3>
+            </>
+          )}
           <TaskRows tasks={tasks} />
         </section>
       </div>
       <p className="muted small">
-        Kalender P0 berisi deadline tugas. Jadwal kelas, Kepanitiaan, dan Google
-        Calendar belum tersedia.
+        Kalender berisi deadline tugas dan jadwal kuliah mingguan pada agenda
+        harian. Kepanitiaan dan Google Calendar belum tersedia.
       </p>
     </>
   );
@@ -1869,9 +1953,13 @@ function EditorDialog({
   const task = editor.kind === "task" ? editor.value : undefined,
     course = editor.kind === "course" ? editor.value : undefined,
     note = editor.kind === "note" ? editor.value : undefined,
-    noun = { course: "mata kuliah", task: "tugas", note: "catatan" }[
-      editor.kind
-    ];
+    slot = editor.kind === "schedule" ? editor.value : undefined,
+    noun = {
+      course: "mata kuliah",
+      task: "tugas",
+      note: "catatan",
+      schedule: "jadwal kuliah",
+    }[editor.kind];
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -1886,6 +1974,17 @@ function EditorDialog({
             credits: Number(f.get("credits")),
           }),
           course?.id,
+        );
+      else if (editor.kind === "schedule")
+        await save(
+          "schedule_items",
+          scheduleSchema.parse({
+            course_id: String(f.get("course_id")),
+            day_of_week: Number(f.get("day_of_week")),
+            start_time: String(f.get("start_time")),
+            end_time: String(f.get("end_time")),
+          }),
+          slot?.id,
         );
       else if (editor.kind === "note")
         await save(
@@ -1921,7 +2020,12 @@ function EditorDialog({
     setError("");
     try {
       await save(
-        { course: "courses", task: "tasks", note: "notes" }[editor.kind],
+        {
+          course: "courses",
+          task: "tasks",
+          note: "notes",
+          schedule: "schedule_items",
+        }[editor.kind],
         undefined,
         editor.value!.id,
         true,
@@ -2038,6 +2142,58 @@ function EditorDialog({
                     ))}
                   </select>
                 </label>
+              </>
+            ) : editor.kind === "schedule" ? (
+              <>
+                <label>
+                  Mata kuliah
+                  <select
+                    name="course_id"
+                    defaultValue={
+                      slot?.course_id || editor.courseId || data.courses[0]?.id
+                    }
+                    required
+                  >
+                    {data.courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Hari
+                  <select
+                    name="day_of_week"
+                    defaultValue={slot?.day_of_week || 1}
+                  >
+                    {weekdays.map((d, i) => (
+                      <option key={d} value={i + 1}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="form-grid">
+                  <label>
+                    Mulai
+                    <input
+                      name="start_time"
+                      type="time"
+                      defaultValue={slot?.start_time.slice(0, 5) || "08:00"}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Selesai
+                    <input
+                      name="end_time"
+                      type="time"
+                      defaultValue={slot?.end_time.slice(0, 5) || "09:40"}
+                      required
+                    />
+                  </label>
+                </div>
               </>
             ) : (
               <>
