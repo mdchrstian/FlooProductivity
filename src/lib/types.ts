@@ -16,12 +16,19 @@ export type Task = {
   status: Status;
   priority: Priority;
 };
+export type Note = {
+  id: string;
+  course_id: string | null;
+  content: string;
+  created_at: string;
+};
 export type Settings = { timezone: string; academic_module_enabled: boolean };
 export type Workspace = {
   userId: string;
   profile: { name: string; email: string };
   courses: Course[];
   tasks: Task[];
+  notes: Note[];
   settings: Settings;
 };
 export const statuses: Record<Status, string> = {

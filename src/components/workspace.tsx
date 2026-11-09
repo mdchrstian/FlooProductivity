@@ -5,19 +5,26 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { DateTime } from "luxon";
 import { browserClient } from "@/lib/supabase/browser";
 import Icon from "./icon";
-import { courseSchema, taskSchema, settingsSchema } from "@/lib/validation";
+import {
+  courseSchema,
+  taskSchema,
+  noteSchema,
+  settingsSchema,
+} from "@/lib/validation";
 import { localDeadline, formatDeadline, dayKey, taskGroups } from "@/lib/time";
 import {
   statuses,
   priorities,
   type Course,
   type Task,
+  type Note,
   type Workspace,
 } from "@/lib/types";
 
 type Editor =
   | { kind: "course"; value?: Course }
   | { kind: "task"; value?: Task; courseId?: string }
+  | { kind: "note"; value?: Note; courseId?: string }
   | null;
 type Store = {
   data: Workspace;
@@ -42,10 +49,10 @@ const nav = [
   ["dashboard", "Dashboard"],
   ["academic", "Mata kuliah"],
   ["calendar", "Kalender"],
+  ["notes", "Catatan"],
   ["settings", "Pengaturan"],
 ] as const;
 const later = [
-  ["notes", "Catatan"],
   ["focus", "Pomodoro"],
   ["committee", "Kepanitiaan"],
 ] as const;
@@ -171,7 +178,21 @@ export default function WorkspaceShell({
             : id
               ? current.courses.map((c) => (c.id === id ? value : c))
               : [...current.courses, value];
-          return { ...current, courses };
+          // Mirrors ON DELETE SET NULL so linked notes stay without a reload.
+          const notes = remove
+            ? current.notes.map((n) =>
+                n.course_id === id ? { ...n, course_id: null } : n,
+              )
+            : current.notes;
+          return { ...current, courses, notes };
+        }
+        if (resource === "notes") {
+          const notes = remove
+            ? current.notes.filter((n) => n.id !== id)
+            : id
+              ? current.notes.map((n) => (n.id === id ? value : n))
+              : [value, ...current.notes];
+          return { ...current, notes };
         }
         const tasks = remove
           ? current.tasks.filter((t) => t.id !== id)
@@ -665,6 +686,7 @@ export function WorkspaceView({ section }: { section: string }) {
   if (section === "settings") return <SettingsView />;
   if (section === "calendar") return <CalendarView />;
   if (section === "academic") return <AcademicView />;
+  if (section === "notes") return <NotesView />;
   if (section !== "dashboard")
     return (
       <>
@@ -1100,6 +1122,15 @@ function AcademicView() {
         </div>
         <div className="actions">
           {course && (
+            <Link
+              className="secondary button"
+              href={"/notes?course=" + course.id}
+            >
+              Catatan (
+              {data.notes.filter((n) => n.course_id === course.id).length})
+            </Link>
+          )}
+          {course && (
             <button
               className="secondary"
               onClick={() => edit({ kind: "course", value: course })}
@@ -1257,6 +1288,115 @@ function AcademicView() {
             </div>
           )}
         </>
+      )}
+    </>
+  );
+}
+function NotesView() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { data, edit } = useWorkspace();
+  // "" = semua, "none" = tanpa mata kuliah, otherwise a course id.
+  const valid = (v: string | null) =>
+    v === "none" || data.courses.some((c) => c.id === v) ? v! : "";
+  const [filter, setFilter] = useState(valid(searchParams.get("course")));
+  useEffect(() => {
+    setFilter(valid(searchParams.get("course")));
+  }, [searchParams, data.courses]);
+  function choose(v: string) {
+    setFilter(v);
+    router.replace(v ? "/notes?course=" + v : "/notes", { scroll: false });
+  }
+  const notes = data.notes.filter((n) =>
+    !filter ? true : filter === "none" ? !n.course_id : n.course_id === filter,
+  );
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <h1>Catatan</h1>
+          <p>Catat materi bebas atau kaitkan dengan satu mata kuliah.</p>
+        </div>
+        <div className="actions">
+          <button
+            className="primary"
+            onClick={() =>
+              edit({
+                kind: "note",
+                courseId: filter && filter !== "none" ? filter : undefined,
+              })
+            }
+          >
+            Catatan baru
+          </button>
+        </div>
+      </div>
+      {data.notes.length > 0 && (
+        <div className="section-heading">
+          <h2>{notes.length} catatan</h2>
+          <div className="actions">
+            <select
+              aria-label="Filter mata kuliah"
+              value={filter}
+              onChange={(e) => choose(e.target.value)}
+            >
+              <option value="">Semua catatan</option>
+              <option value="none">Tanpa mata kuliah</option>
+              {data.courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      {notes.length ? (
+        <div className="course-grid">
+          {notes.map((n) => {
+            const [first, ...rest] = n.content.split("\n");
+            return (
+              <article className="course note" key={n.id}>
+                <button
+                  className="course-title"
+                  aria-label={"Edit catatan " + first}
+                  onClick={() => edit({ kind: "note", value: n })}
+                >
+                  <h2>{first}</h2>
+                  {rest.join("\n").trim() && (
+                    <p className="note-body">{rest.join("\n").trim()}</p>
+                  )}
+                </button>
+                <div className="course-meta">
+                  <span>
+                    {data.courses.find((c) => c.id === n.course_id)?.name ||
+                      "Tanpa mata kuliah"}
+                  </span>
+                  <span>
+                    {DateTime.fromISO(n.created_at)
+                      .setZone(data.settings.timezone)
+                      .setLocale("id")
+                      .toFormat("d MMM yyyy")}
+                  </span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <Empty
+          title={
+            data.notes.length
+              ? "Tidak ada catatan di filter ini"
+              : "Belum ada catatan"
+          }
+        >
+          <p>
+            {data.notes.length
+              ? "Pilih filter lain atau buat catatan baru."
+              : "Tulis catatan pertama, misalnya ringkasan materi kuliah."}
+          </p>
+        </Empty>
       )}
     </>
   );
@@ -1521,9 +1661,9 @@ function SettingsView() {
       <section className="roadmap">
         <h2>Tahap berikutnya</h2>
         <p>
-          Catatan, Pomodoro, Kepanitiaan, login Google, Google Calendar, dan
-          Gmail belum tersedia. Tidak ada sinkronisasi atau pengiriman email
-          melalui Gmail pada tahap ini.
+          Pomodoro, Kepanitiaan, login Google, Google Calendar, dan Gmail belum
+          tersedia. Tidak ada sinkronisasi atau pengiriman email melalui Gmail
+          pada tahap ini.
         </p>
         <Link href="/forgot-password">Pulihkan password akun</Link>
       </section>
@@ -1562,7 +1702,11 @@ function EditorDialog({
     };
   }, []);
   const task = editor.kind === "task" ? editor.value : undefined,
-    course = editor.kind === "course" ? editor.value : undefined;
+    course = editor.kind === "course" ? editor.value : undefined,
+    note = editor.kind === "note" ? editor.value : undefined,
+    noun = { course: "mata kuliah", task: "tugas", note: "catatan" }[
+      editor.kind
+    ];
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -1577,6 +1721,15 @@ function EditorDialog({
             credits: Number(f.get("credits")),
           }),
           course?.id,
+        );
+      else if (editor.kind === "note")
+        await save(
+          "notes",
+          noteSchema.parse({
+            content: String(f.get("content")),
+            course_id: String(f.get("course_id")) || null,
+          }),
+          note?.id,
         );
       else
         await save(
@@ -1603,7 +1756,7 @@ function EditorDialog({
     setError("");
     try {
       await save(
-        editor.kind === "course" ? "courses" : "tasks",
+        { course: "courses", task: "tasks", note: "notes" }[editor.kind],
         undefined,
         editor.value!.id,
         true,
@@ -1626,11 +1779,8 @@ function EditorDialog({
       <div className="dialog-heading">
         <h2 id="editor-title">
           {confirmDelete
-            ? "Hapus " +
-              (editor.kind === "course" ? "mata kuliah" : "tugas") +
-              "?"
-            : (editor.value ? "Edit " : "Tambah ") +
-              (editor.kind === "course" ? "mata kuliah" : "tugas")}
+            ? "Hapus " + noun + "?"
+            : (editor.value ? "Edit " : "Tambah ") + noun}
         </h2>
         <button
           type="button"
@@ -1693,6 +1843,35 @@ function EditorDialog({
                     defaultValue={course?.credits || 3}
                     required
                   />
+                </label>
+              </>
+            ) : editor.kind === "note" ? (
+              <>
+                <label>
+                  Isi catatan
+                  <textarea
+                    name="content"
+                    defaultValue={note?.content}
+                    required
+                    maxLength={10000}
+                    rows={8}
+                  />
+                </label>
+                <label>
+                  Mata kuliah (opsional)
+                  <select
+                    name="course_id"
+                    defaultValue={
+                      note ? note.course_id || "" : editor.courseId || ""
+                    }
+                  >
+                    <option value="">Tanpa mata kuliah</option>
+                    {data.courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </>
             ) : (

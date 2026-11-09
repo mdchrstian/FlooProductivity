@@ -255,6 +255,89 @@ await check(
     return "Ketiga status tersimpan dan terbaca kembali.";
   },
 );
+await check(
+  "INT-N1",
+  "Catatan terisolasi dan Course dihapus melepas catatan",
+  async () => {
+    const c = (
+      await a
+        .from("courses")
+        .insert({ user_id: uidA, name: "Uji catatan", credits: 1 })
+        .select()
+        .single()
+    ).data!.id;
+    const linked = await a
+      .from("notes")
+      .insert({ user_id: uidA, course_id: c, content: "terkait" })
+      .select()
+      .single();
+    const free = await a
+      .from("notes")
+      .insert({ user_id: uidA, content: "bebas" })
+      .select()
+      .single();
+    assert.equal(linked.error, null);
+    assert.equal(free.error, null);
+    assert.deepEqual(
+      (await b.from("notes").select().eq("id", free.data.id)).data,
+      [],
+    );
+    assert.deepEqual(
+      (
+        await b
+          .from("notes")
+          .update({ content: "forged" })
+          .eq("id", free.data.id)
+          .select()
+      ).data,
+      [],
+    );
+    assert.deepEqual(
+      (await b.from("notes").delete().eq("id", free.data.id).select()).data,
+      [],
+    );
+    assert.ok(
+      (await a.from("notes").insert({ user_id: uidB, content: "x" })).error,
+    );
+    assert.ok(
+      (
+        await a
+          .from("notes")
+          .insert({ user_id: uidA, course_id: cb, content: "x" })
+      ).error,
+    );
+    assert.ok(
+      (
+        await a
+          .from("notes")
+          .update({ course_id: cb })
+          .eq("id", free.data.id)
+          .select()
+      ).error,
+    );
+    assert.ok(
+      (await a.from("notes").update({ user_id: uidB }).eq("id", free.data.id))
+        .error,
+    );
+    assert.equal((await a.from("courses").delete().eq("id", c)).error, null);
+    assert.equal(
+      (
+        await a
+          .from("notes")
+          .select("course_id")
+          .eq("id", linked.data.id)
+          .single()
+      ).data?.course_id,
+      null,
+    );
+    assert.equal(
+      (await a.from("notes").delete().in("id", [linked.data.id, free.data.id]))
+        .error,
+      null,
+    );
+    return "RLS menolak akses silang; SET NULL mempertahankan catatan.";
+  },
+);
 await check("INT-13", "Course dengan Task tidak dapat dihapus", async () => {
   assert.equal(
     (await a.from("courses").delete().eq("id", ca)).error?.code,

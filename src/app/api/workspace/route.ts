@@ -15,6 +15,7 @@ export async function GET() {
     db.from("users").select("name,email").eq("id", user.id).single(),
     db.from("courses").select("*").order("created_at"),
     db.from("tasks").select("*").order("deadline_at"),
+    db.from("notes").select("*").order("created_at", { ascending: false }),
     db
       .from("settings")
       .select("timezone,academic_module_enabled")
@@ -32,7 +33,8 @@ export async function GET() {
       profile: results[0].data,
       courses: results[1].data,
       tasks: results[2].data,
-      settings: results[3].data,
+      notes: results[3].data,
+      settings: results[4].data,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );

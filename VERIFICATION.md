@@ -47,3 +47,13 @@ Lima pengulangan navigasi penuh tiap halaman pada produksi lokal dengan Supabase
 Tidak ada klaim P0 tanpa keterbatasan. Bukti yang tersedia harus dibaca sesuai lingkup dan fase pengujiannya.
 
 Laporan, referensi, log, screenshot, serta metadata QA disimpan lokal dan diabaikan Git. Path bukti di atas merupakan lokasi arsip lokal, bukan tautan unduhan dalam repositori publik.
+
+## P1 Catatan (9 November 2026)
+
+Dijalankan: `tsc --noEmit`, `next build --webpack`, `npm test` (10 lulus), migrasi `202611090001_notes.sql` pada proyek hosted, dan `npm run test:integration` (19 kasus lulus, termasuk INT-N1: isolasi dua akun, penolakan Course/user_id akun lain, Course dihapus melepas catatan menjadi `course_id = null`).
+
+Uji browser manual (akun A, lebar panel sempit ±700 px, hosted): keadaan kosong, validasi isi kosong, buat catatan bebas dan terkait Course, urutan terbaru dahulu, filter Semua/Tanpa mata kuliah, tautan `?course=` dengan keadaan filter kosong, data bertahan setelah muat ulang, edit, hapus dengan konfirmasi, hitungan "Catatan (n)" pada halaman Course.
+
+Uji browser lanjutan (akun A, hosted): lebar 375 px (satu kolom, tanpa overflow horizontal, dialog 17–358 px, isi panjang terpotong) dan 1440 px (tiga kolom, menu Catatan aktif). Data uji dihapus setelah pengecekan.
+
+Belum dijalankan: uji browser akun B (isolasi hanya dibuktikan pada level database oleh INT-N1), hapus Course berisi catatan lewat UI. `scripts/check-ui.mjs` menguji bundel prototipe lama `dist/app.js`, bukan aplikasi Next.js, sehingga tidak relevan untuk Catatan dan tidak dijalankan.

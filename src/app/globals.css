@@ -2957,3 +2957,11 @@ dialog::backdrop {
     pointer-events: auto;
   }
 }
+.note-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

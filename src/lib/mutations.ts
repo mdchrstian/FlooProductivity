@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverClient } from "./supabase/server";
-import { courseSchema, taskSchema, settingsSchema } from "./validation";
+import {
+  courseSchema,
+  taskSchema,
+  noteSchema,
+  settingsSchema,
+} from "./validation";
 import { z } from "zod";
 export async function mutate(req: NextRequest, resource: string, id?: string) {
-  if (!["courses", "tasks", "settings"].includes(resource))
+  if (!["courses", "tasks", "notes", "settings"].includes(resource))
     return NextResponse.json({ error: "Tidak ditemukan." }, { status: 404 });
   const allowedOrigins = [
     new URL(process.env.NEXT_PUBLIC_APP_URL || req.url).origin,
@@ -64,7 +69,12 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
         );
       return NextResponse.json({ ok: true });
     }
-    const schema = resource === "courses" ? courseSchema : taskSchema;
+    const schema =
+      resource === "courses"
+        ? courseSchema
+        : resource === "notes"
+          ? noteSchema
+          : taskSchema;
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success)
       return NextResponse.json(
@@ -79,7 +89,7 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
             .from(resource)
             .insert({
               ...parsed.data,
-              ...(resource === "courses" ? { user_id: user.id } : {}),
+              ...(resource === "tasks" ? {} : { user_id: user.id }),
             } as Record<string, unknown>)
             .select()
             .single()

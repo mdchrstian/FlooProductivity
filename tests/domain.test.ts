@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import {
   courseSchema,
   taskSchema,
+  noteSchema,
   settingsSchema,
   registrationSchema,
 } from "../src/lib/validation";
@@ -112,5 +113,24 @@ test("Empty workspace has zero groups", () => {
   assert.equal(
     groups.today.length + groups.upcoming.length + groups.overdue.length,
     0,
+  );
+});
+test("Note needs trimmed content up to 10000 chars and an optional Course uuid", () => {
+  const id = "7a6c61e0-9d80-41e3-bddc-6877f40d2207";
+  for (const content of ["", "   ", "x".repeat(10001)])
+    assert.equal(noteSchema.safeParse({ content }).success, false);
+  assert.equal(noteSchema.parse({ content: " halo " }).content, "halo");
+  assert.equal(noteSchema.parse({ content: "a" }).course_id, null);
+  assert.equal(
+    noteSchema.safeParse({ content: "a", course_id: id }).success,
+    true,
+  );
+  assert.equal(
+    noteSchema.safeParse({ content: "a", course_id: "x" }).success,
+    false,
+  );
+  assert.equal(
+    noteSchema.safeParse({ content: "a", user_id: id }).success,
+    false,
   );
 });

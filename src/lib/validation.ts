@@ -23,6 +23,16 @@ export const taskSchema = z
     priority: z.enum(["low", "medium", "high"]).default("medium"),
   })
   .strict();
+export const noteSchema = z
+  .object({
+    content: z
+      .string()
+      .trim()
+      .min(1, "Isi catatan wajib diisi.")
+      .max(10000, "Catatan maksimal 10.000 karakter."),
+    course_id: z.uuid("Mata kuliah tidak valid.").nullable().default(null),
+  })
+  .strict();
 export const settingsSchema = z
   .object({
     timezone: timezoneSchema,
