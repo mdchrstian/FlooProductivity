@@ -33,6 +33,16 @@ export const noteSchema = z
     course_id: z.uuid("Mata kuliah tidak valid.").nullable().default(null),
   })
   .strict();
+export const sessionSchema = z
+  .object({
+    duration_minutes: z
+      .number()
+      .int("Durasi harus bilangan bulat.")
+      .min(1, "Durasi minimal 1 menit.")
+      .max(180, "Durasi maksimal 180 menit."),
+    course_id: z.uuid("Mata kuliah tidak valid.").nullable().default(null),
+  })
+  .strict();
 export const settingsSchema = z
   .object({
     timezone: timezoneSchema,

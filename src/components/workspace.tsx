@@ -9,6 +9,7 @@ import {
   courseSchema,
   taskSchema,
   noteSchema,
+  sessionSchema,
   settingsSchema,
 } from "@/lib/validation";
 import { localDeadline, formatDeadline, dayKey, taskGroups } from "@/lib/time";
@@ -50,12 +51,10 @@ const nav = [
   ["academic", "Mata kuliah"],
   ["calendar", "Kalender"],
   ["notes", "Catatan"],
+  ["focus", "Pomodoro"],
   ["settings", "Pengaturan"],
 ] as const;
-const later = [
-  ["focus", "Pomodoro"],
-  ["committee", "Kepanitiaan"],
-] as const;
+const later = [["committee", "Kepanitiaan"]] as const;
 export default function WorkspaceShell({
   children,
   userId,
@@ -184,7 +183,18 @@ export default function WorkspaceShell({
                 n.course_id === id ? { ...n, course_id: null } : n,
               )
             : current.notes;
-          return { ...current, courses, notes };
+          const sessions = remove
+            ? current.sessions.map((s) =>
+                s.course_id === id ? { ...s, course_id: null } : s,
+              )
+            : current.sessions;
+          return { ...current, courses, notes, sessions };
+        }
+        if (resource === "pomodoro_sessions") {
+          const sessions = remove
+            ? current.sessions.filter((s) => s.id !== id)
+            : [value, ...current.sessions];
+          return { ...current, sessions };
         }
         if (resource === "notes") {
           const notes = remove
@@ -687,6 +697,7 @@ export function WorkspaceView({ section }: { section: string }) {
   if (section === "calendar") return <CalendarView />;
   if (section === "academic") return <AcademicView />;
   if (section === "notes") return <NotesView />;
+  if (section === "focus") return <FocusView />;
   if (section !== "dashboard")
     return (
       <>
@@ -1401,6 +1412,153 @@ function NotesView() {
     </>
   );
 }
+const focusOptions = [15, 25, 45, 60];
+function FocusView() {
+  const { data, save, notice } = useWorkspace();
+  const [minutes, setMinutes] = useState(25),
+    [courseId, setCourseId] = useState(""),
+    [run, setRun] = useState<{
+      end: number;
+      minutes: number;
+      courseId: string;
+    } | null>(null),
+    [left, setLeft] = useState(25 * 60);
+  // Counts down from an end timestamp so background-tab throttling cannot drift it.
+  useEffect(() => {
+    if (!run) return;
+    const timer = setInterval(async () => {
+      const s = Math.max(0, Math.ceil((run.end - Date.now()) / 1000));
+      setLeft(s);
+      if (s > 0) return;
+      clearInterval(timer);
+      setRun(null);
+      try {
+        await save(
+          "pomodoro_sessions",
+          sessionSchema.parse({
+            duration_minutes: run.minutes,
+            course_id: run.courseId || null,
+          }),
+        );
+      } catch (e) {
+        notice((e as Error).message);
+      }
+    }, 250);
+    return () => clearInterval(timer);
+  }, [run]);
+  const shown = run ? left : minutes * 60,
+    today = DateTime.now().setZone(data.settings.timezone).toISODate(),
+    todayTotal = data.sessions
+      .filter((s) => dayKey(s.created_at, data.settings.timezone) === today)
+      .reduce((sum, s) => sum + s.duration_minutes, 0);
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <h1>Pomodoro</h1>
+          <p>Fokus satu sesi, lalu catat otomatis saat waktu habis.</p>
+        </div>
+      </div>
+      <section className="panel focus-panel">
+        <div className="focus-time" role="timer" aria-label="Sisa waktu fokus">
+          {String(Math.floor(shown / 60)).padStart(2, "0")}:
+          {String(shown % 60).padStart(2, "0")}
+        </div>
+        <div className="actions">
+          <label>
+            Durasi
+            <select
+              value={minutes}
+              disabled={!!run}
+              onChange={(e) => setMinutes(Number(e.target.value))}
+            >
+              {focusOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m} menit
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Mata kuliah (opsional)
+            <select
+              value={courseId}
+              disabled={!!run}
+              onChange={(e) => setCourseId(e.target.value)}
+            >
+              <option value="">Tanpa mata kuliah</option>
+              {data.courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {run ? (
+            <button className="secondary" onClick={() => setRun(null)}>
+              Hentikan (tidak dicatat)
+            </button>
+          ) : (
+            <button
+              className="primary"
+              onClick={() => {
+                setLeft(minutes * 60);
+                setRun({
+                  end: Date.now() + minutes * 60000,
+                  minutes,
+                  courseId,
+                });
+              }}
+            >
+              Mulai fokus
+            </button>
+          )}
+        </div>
+        <p className="muted small">
+          Timer berjalan selama halaman ini terbuka. Pindah halaman
+          menghentikannya tanpa mencatat sesi.
+        </p>
+      </section>
+      <div className="section-heading">
+        <h2>Riwayat sesi</h2>
+        <span className="muted">Hari ini: {todayTotal} menit</span>
+      </div>
+      {data.sessions.length ? (
+        <div className="task-list">
+          {data.sessions.slice(0, 20).map((s) => (
+            <div className="task-row" key={s.id}>
+              <span>
+                {s.duration_minutes} menit ·{" "}
+                {data.courses.find((c) => c.id === s.course_id)?.name ||
+                  "Tanpa mata kuliah"}
+              </span>
+              <span className="muted small">
+                {formatDeadline(s.created_at, data.settings.timezone)}
+              </span>
+              <button
+                className="text-button"
+                aria-label="Hapus sesi"
+                onClick={async () => {
+                  try {
+                    await save("pomodoro_sessions", undefined, s.id, true);
+                  } catch (e) {
+                    notice((e as Error).message);
+                  }
+                }}
+              >
+                Hapus
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Empty title="Belum ada sesi">
+          <p>Mulai sesi pertamamu. Sesi tercatat saat timer selesai.</p>
+        </Empty>
+      )}
+    </>
+  );
+}
 function CalendarView() {
   const { data, now, edit } = useWorkspace(),
     zone = data.settings.timezone;
@@ -1661,9 +1819,9 @@ function SettingsView() {
       <section className="roadmap">
         <h2>Tahap berikutnya</h2>
         <p>
-          Pomodoro, Kepanitiaan, login Google, Google Calendar, dan Gmail belum
-          tersedia. Tidak ada sinkronisasi atau pengiriman email melalui Gmail
-          pada tahap ini.
+          Kepanitiaan, login Google, Google Calendar, dan Gmail belum tersedia.
+          Tidak ada sinkronisasi atau pengiriman email melalui Gmail pada tahap
+          ini.
         </p>
         <Link href="/forgot-password">Pulihkan password akun</Link>
       </section>

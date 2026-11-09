@@ -5,6 +5,7 @@ import {
   courseSchema,
   taskSchema,
   noteSchema,
+  sessionSchema,
   settingsSchema,
   registrationSchema,
 } from "../src/lib/validation";
@@ -131,6 +132,15 @@ test("Note needs trimmed content up to 10000 chars and an optional Course uuid",
   );
   assert.equal(
     noteSchema.safeParse({ content: "a", user_id: id }).success,
+    false,
+  );
+});
+test("Pomodoro session needs an integer duration of 1 to 180 minutes", () => {
+  for (const duration_minutes of [0, 181, 2.5, -5])
+    assert.equal(sessionSchema.safeParse({ duration_minutes }).success, false);
+  assert.equal(sessionSchema.parse({ duration_minutes: 25 }).course_id, null);
+  assert.equal(
+    sessionSchema.safeParse({ duration_minutes: 25, user_id: "x" }).success,
     false,
   );
 });

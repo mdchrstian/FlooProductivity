@@ -57,3 +57,11 @@ Uji browser manual (akun A, lebar panel sempit ±700 px, hosted): keadaan kosong
 Uji browser lanjutan (akun A, hosted): lebar 375 px (satu kolom, tanpa overflow horizontal, dialog 17–358 px, isi panjang terpotong) dan 1440 px (tiga kolom, menu Catatan aktif). Data uji dihapus setelah pengecekan.
 
 Belum dijalankan: uji browser akun B (isolasi hanya dibuktikan pada level database oleh INT-N1), hapus Course berisi catatan lewat UI. `scripts/check-ui.mjs` menguji bundel prototipe lama `dist/app.js`, bukan aplikasi Next.js, sehingga tidak relevan untuk Catatan dan tidak dijalankan.
+
+## P1 Pomodoro (10 November 2026)
+
+Dijalankan: `tsc --noEmit`, `next build --webpack`, `npm test` (11 lulus), migrasi `202611100001_pomodoro.sql` pada proyek hosted, dan `npm run test:integration` (20 kasus lulus, termasuk INT-P1: isolasi dua akun, batas durasi 1–180, penolakan Course/user_id akun lain, sesi tidak dapat diubah, Course dihapus melepas sesi menjadi `course_id = null`).
+
+Uji browser (akun A, hosted): timer menghitung mundur dan tombol Hentikan muncul; saat waktu habis sesi tersimpan otomatis dan tampil di riwayat dengan total "Hari ini"; data bertahan setelah muat ulang; lebar 375 px tanpa overflow horizontal; hapus sesi lewat UI. Selesainya timer disimulasikan dengan memajukan `Date.now()` di halaman, bukan menunggu 25 menit nyata.
+
+Belum dijalankan: uji browser akun B, lebar desktop lebar, hentikan timer lalu pastikan tidak tercatat, timer saat tab latar belakang, hapus Course berisi sesi lewat UI. Tidak ada pengaturan `pomodoro_enabled`. Timer berhenti saat pindah halaman.

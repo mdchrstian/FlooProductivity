@@ -22,6 +22,12 @@ export type Note = {
   content: string;
   created_at: string;
 };
+export type PomodoroSession = {
+  id: string;
+  course_id: string | null;
+  duration_minutes: number;
+  created_at: string;
+};
 export type Settings = { timezone: string; academic_module_enabled: boolean };
 export type Workspace = {
   userId: string;
@@ -29,6 +35,7 @@ export type Workspace = {
   courses: Course[];
   tasks: Task[];
   notes: Note[];
+  sessions: PomodoroSession[];
   settings: Settings;
 };
 export const statuses: Record<Status, string> = {

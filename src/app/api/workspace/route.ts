@@ -17,6 +17,11 @@ export async function GET() {
     db.from("tasks").select("*").order("deadline_at"),
     db.from("notes").select("*").order("created_at", { ascending: false }),
     db
+      .from("pomodoro_sessions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    db
       .from("settings")
       .select("timezone,academic_module_enabled")
       .eq("user_id", user.id)
@@ -34,7 +39,8 @@ export async function GET() {
       courses: results[1].data,
       tasks: results[2].data,
       notes: results[3].data,
-      settings: results[4].data,
+      sessions: results[4].data,
+      settings: results[5].data,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );

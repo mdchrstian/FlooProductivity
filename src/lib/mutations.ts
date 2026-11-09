@@ -4,11 +4,16 @@ import {
   courseSchema,
   taskSchema,
   noteSchema,
+  sessionSchema,
   settingsSchema,
 } from "./validation";
 import { z } from "zod";
 export async function mutate(req: NextRequest, resource: string, id?: string) {
-  if (!["courses", "tasks", "notes", "settings"].includes(resource))
+  if (
+    !["courses", "tasks", "notes", "pomodoro_sessions", "settings"].includes(
+      resource,
+    )
+  )
     return NextResponse.json({ error: "Tidak ditemukan." }, { status: 404 });
   const allowedOrigins = [
     new URL(process.env.NEXT_PUBLIC_APP_URL || req.url).origin,
@@ -74,7 +79,9 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
         ? courseSchema
         : resource === "notes"
           ? noteSchema
-          : taskSchema;
+          : resource === "pomodoro_sessions"
+            ? sessionSchema
+            : taskSchema;
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success)
       return NextResponse.json(

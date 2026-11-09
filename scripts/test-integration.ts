@@ -338,6 +338,95 @@ await check(
     return "RLS menolak akses silang; SET NULL mempertahankan catatan.";
   },
 );
+await check(
+  "INT-P1",
+  "Sesi Pomodoro terisolasi dan Course dihapus melepas sesi",
+  async () => {
+    const c = (
+      await a
+        .from("courses")
+        .insert({ user_id: uidA, name: "Uji pomodoro", credits: 1 })
+        .select()
+        .single()
+    ).data!.id;
+    const linked = await a
+      .from("pomodoro_sessions")
+      .insert({ user_id: uidA, course_id: c, duration_minutes: 25 })
+      .select()
+      .single();
+    assert.equal(linked.error, null);
+    assert.deepEqual(
+      (await b.from("pomodoro_sessions").select().eq("id", linked.data.id))
+        .data,
+      [],
+    );
+    assert.deepEqual(
+      (
+        await b
+          .from("pomodoro_sessions")
+          .delete()
+          .eq("id", linked.data.id)
+          .select()
+      ).data,
+      [],
+    );
+    assert.ok(
+      (
+        await a
+          .from("pomodoro_sessions")
+          .insert({ user_id: uidA, duration_minutes: 0 })
+      ).error,
+    );
+    assert.ok(
+      (
+        await a
+          .from("pomodoro_sessions")
+          .insert({ user_id: uidA, duration_minutes: 181 })
+      ).error,
+    );
+    assert.ok(
+      (
+        await a
+          .from("pomodoro_sessions")
+          .insert({ user_id: uidB, duration_minutes: 25 })
+      ).error,
+    );
+    assert.ok(
+      (
+        await a
+          .from("pomodoro_sessions")
+          .insert({ user_id: uidA, course_id: cb, duration_minutes: 25 })
+      ).error,
+    );
+    assert.deepEqual(
+      (
+        await a
+          .from("pomodoro_sessions")
+          .update({ duration_minutes: 99 })
+          .eq("id", linked.data.id)
+          .select()
+      ).data ?? [],
+      [],
+    );
+    assert.equal((await a.from("courses").delete().eq("id", c)).error, null);
+    assert.equal(
+      (
+        await a
+          .from("pomodoro_sessions")
+          .select("course_id")
+          .eq("id", linked.data.id)
+          .single()
+      ).data?.course_id,
+      null,
+    );
+    assert.equal(
+      (await a.from("pomodoro_sessions").delete().eq("id", linked.data.id))
+        .error,
+      null,
+    );
+    return "RLS menolak akses silang; durasi dibatasi; SET NULL mempertahankan sesi.";
+  },
+);
 await check("INT-13", "Course dengan Task tidak dapat dihapus", async () => {
   assert.equal(
     (await a.from("courses").delete().eq("id", ca)).error?.code,

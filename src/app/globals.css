@@ -2965,3 +2965,20 @@ dialog::backdrop {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.focus-panel {
+  display: grid;
+  gap: 20px;
+  justify-items: center;
+  margin-bottom: 32px;
+}
+.focus-time {
+  font-size: 64px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.focus-panel .actions {
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+}
