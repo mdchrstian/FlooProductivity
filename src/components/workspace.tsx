@@ -497,10 +497,15 @@ function TaskRows({
             />
           )}
           {board && (
-            <span className="task-course">
-              <span className="source-dot" />
-              {data.courses.find((c) => c.id === task.course_id)?.name}
-            </span>
+            <div className="task-head">
+              <span className="task-course">
+                <span className="source-dot" />
+                {data.courses.find((c) => c.id === task.course_id)?.name}
+              </span>
+              <span className={"priority " + task.priority}>
+                {priorities[task.priority]}
+              </span>
+            </div>
           )}
           <button
             className="task-content"
@@ -520,9 +525,11 @@ function TaskRows({
               .setLocale("id")
               .toFormat("d LLL, HH.mm")}
           </span>
-          <span className={"priority " + task.priority}>
-            {priorities[task.priority]}
-          </span>
+          {!board && (
+            <span className={"priority " + task.priority}>
+              {priorities[task.priority]}
+            </span>
+          )}
           {board && (
             <>
               <label className="sr-only" htmlFor={"status-" + task.id}>

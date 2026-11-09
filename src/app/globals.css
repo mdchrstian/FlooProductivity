@@ -1380,6 +1380,21 @@ fieldset {
   line-height: 1.65;
   margin-top: 7px;
 }
+.task-head {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.task-head .task-course {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-head .priority {
+  flex-shrink: 0;
+}
 .task-course {
   flex-basis: 100%;
   display: flex;
