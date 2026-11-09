@@ -514,6 +514,192 @@ await check(
     return "RLS menolak akses silang; batas hari/jam ditegakkan; CASCADE menghapus slot.";
   },
 );
+await check(
+  "INT-E1",
+  "Event, checklist, dan konteks Task tepat satu",
+  async () => {
+    const ev = await a
+      .from("events")
+      .insert({
+        user_id: uidA,
+        name: "Uji event",
+        deadline_at: "2026-12-31T16:00:00Z",
+      })
+      .select()
+      .single();
+    assert.equal(ev.error, null);
+    const eid = ev.data.id;
+    const chk = await a
+      .from("checklist_items")
+      .insert({ event_id: eid, label: "Item uji" })
+      .select()
+      .single();
+    assert.equal(chk.error, null);
+    // isolation: B sees and changes nothing of A's Event or checklist
+    assert.deepEqual((await b.from("events").select().eq("id", eid)).data, []);
+    assert.deepEqual(
+      (await b.from("events").update({ name: "forged" }).eq("id", eid).select())
+        .data,
+      [],
+    );
+    assert.deepEqual(
+      (await b.from("events").delete().eq("id", eid).select()).data,
+      [],
+    );
+    assert.deepEqual(
+      (await b.from("checklist_items").select().eq("id", chk.data.id)).data,
+      [],
+    );
+    assert.deepEqual(
+      (
+        await b
+          .from("checklist_items")
+          .update({ label: "forged" })
+          .eq("id", chk.data.id)
+          .select()
+      ).data,
+      [],
+    );
+    assert.ok(
+      (
+        await b
+          .from("checklist_items")
+          .insert({ event_id: eid, label: "intruder" })
+      ).error,
+    );
+    assert.ok(
+      (
+        await a.from("events").insert({
+          user_id: uidB,
+          name: "x",
+          deadline_at: "2026-12-31T16:00:00Z",
+        })
+      ).error,
+    );
+    // Task: exactly one parent, only owned parents
+    const t = { title: "Tugas Event", deadline_at: "2026-12-31T16:00:00Z" };
+    assert.ok(
+      (await a.from("tasks").insert({ ...t, course_id: ca, event_id: eid }))
+        .error,
+    );
+    assert.ok((await a.from("tasks").insert({ ...t })).error);
+    const own = await a
+      .from("tasks")
+      .insert({ ...t, event_id: eid })
+      .select()
+      .single();
+    assert.equal(own.error, null);
+    const bEv = (
+      await b
+        .from("events")
+        .insert({
+          user_id: uidB,
+          name: "Event B",
+          deadline_at: "2026-12-31T16:00:00Z",
+        })
+        .select()
+        .single()
+    ).data!.id;
+    assert.ok((await a.from("tasks").insert({ ...t, event_id: bEv })).error);
+    assert.ok(
+      (
+        await a
+          .from("tasks")
+          .update({ course_id: null, event_id: bEv })
+          .eq("id", own.data.id)
+          .select()
+      ).error,
+    );
+    assert.deepEqual(
+      (await b.from("tasks").select().eq("id", own.data.id)).data,
+      [],
+    );
+    // Event with Tasks cannot be deleted
+    assert.equal(
+      (await a.from("events").delete().eq("id", eid)).error?.code,
+      "23503",
+    );
+    assert.equal(
+      (await a.from("tasks").delete().eq("id", own.data.id)).error,
+      null,
+    );
+    // create_event is atomic, limited to 20 items, and RLS-bound
+    const made = await a.rpc("create_event", {
+      p_name: "Via RPC",
+      p_role: "Ketua",
+      p_deadline: "2026-12-31T16:00:00Z",
+      p_items: ["Satu", "Dua"],
+    });
+    assert.equal(made.error, null);
+    assert.equal(made.data.items.length, 2);
+    assert.deepEqual(
+      made.data.items.map((i: { position: number }) => i.position),
+      [0, 1],
+    );
+    assert.ok(
+      (
+        await a.rpc("create_event", {
+          p_name: "Banyak",
+          p_role: "",
+          p_deadline: "2026-12-31T16:00:00Z",
+          p_items: Array.from({ length: 21 }, (_, i) => "x" + i),
+        })
+      ).error,
+    );
+    assert.deepEqual(
+      (await a.from("events").select("id").eq("name", "Banyak")).data,
+      [],
+    );
+    assert.ok(
+      (
+        await anon.rpc("create_event", {
+          p_name: "x",
+          p_role: "",
+          p_deadline: "2026-12-31T16:00:00Z",
+          p_items: [],
+        })
+      ).error,
+    );
+    // deleting an Event removes its checklist; toggle persists through update_preferences
+    const rpcId = made.data.event.id;
+    assert.equal((await a.from("events").delete().eq("id", rpcId)).error, null);
+    assert.deepEqual(
+      (await a.from("checklist_items").select().eq("event_id", rpcId)).data,
+      [],
+    );
+    assert.equal((await a.from("events").delete().eq("id", eid)).error, null);
+    assert.equal((await b.from("events").delete().eq("id", bEv)).error, null);
+    const prefs = (
+      await a
+        .from("settings")
+        .select("timezone,academic_module_enabled,committee_module_enabled")
+        .eq("user_id", uidA)
+        .single()
+    ).data!;
+    const name = (await a.from("users").select("name").eq("id", uidA).single())
+      .data!.name;
+    const set = (committee: boolean) =>
+      a.rpc("update_preferences", {
+        p_name: name,
+        p_timezone: prefs.timezone,
+        p_academic: prefs.academic_module_enabled,
+        p_committee: committee,
+      });
+    assert.equal((await set(!prefs.committee_module_enabled)).error, null);
+    assert.equal(
+      (
+        await a
+          .from("settings")
+          .select("committee_module_enabled")
+          .eq("user_id", uidA)
+          .single()
+      ).data?.committee_module_enabled,
+      !prefs.committee_module_enabled,
+    );
+    assert.equal((await set(prefs.committee_module_enabled)).error, null);
+    return "Isolasi, tepat-satu-konteks, RESTRICT, CASCADE checklist, create_event atomik, dan toggle lulus.";
+  },
+);
 await check("INT-13", "Course dengan Task tidak dapat dihapus", async () => {
   assert.equal(
     (await a.from("courses").delete().eq("id", ca)).error?.code,
@@ -549,6 +735,7 @@ await check(
           p_name: "Akun Uji A",
           p_timezone: "Asia/Makassar",
           p_academic: false,
+          p_committee: true,
         })
       ).error,
       null,
@@ -564,6 +751,7 @@ await check(
           p_name: "rollback-test",
           p_timezone: "Invalid/Zone",
           p_academic: true,
+          p_committee: true,
         })
       ).error,
     );
@@ -575,6 +763,7 @@ await check(
       p_name: "Akun Uji A",
       p_timezone: "Asia/Makassar",
       p_academic: true,
+      p_committee: true,
     });
     return "Perubahan valid tersimpan; transaksi invalid rollback.";
   },

@@ -1134,6 +1134,10 @@ kbd {
   background: #edf4f0;
   color: #3d6e55;
 }
+.color-3 {
+  background: #fbf1df;
+  color: #8a5a12;
+}
 .course-overview-link {
   display: flex;
   align-items: center;
@@ -3035,4 +3039,43 @@ dialog::backdrop {
   .focus-panel p {
     text-align: left;
   }
+}
+.source-dot.committee {
+  background: #c28a2c;
+}
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0 22px;
+}
+.checklist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.checklist label {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+.checklist .completed {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.checklist-empty {
+  padding: 0 22px;
+}
+.checklist-add {
+  display: flex;
+  gap: 10px;
+  padding: 16px 22px 20px;
+}
+.checklist-add input {
+  flex: 1;
 }

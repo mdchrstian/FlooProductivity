@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IANAZone } from "luxon";
+import { templateKeys } from "./templates";
 export const timezoneSchema = z
   .string()
   .refine((v) => IANAZone.isValidZone(v), "Zona waktu tidak valid.");
@@ -15,12 +16,33 @@ export const courseSchema = z
   .strict();
 export const taskSchema = z
   .object({
-    course_id: z.uuid("Pilih mata kuliah."),
+    course_id: z.uuid("Pilih mata kuliah.").nullable().default(null),
+    event_id: z.uuid("Pilih Event.").nullable().default(null),
     title: z.string().trim().min(1, "Judul tugas wajib diisi.").max(200),
     description: z.string().trim().max(5000).default(""),
     deadline_at: z.iso.datetime({ offset: true }),
     status: z.enum(["todo", "in_progress", "done"]).default("todo"),
     priority: z.enum(["low", "medium", "high"]).default("medium"),
+  })
+  .strict()
+  .refine((v) => (v.course_id === null) !== (v.event_id === null), {
+    message: "Pilih tepat satu mata kuliah atau Event.",
+    path: ["course_id"],
+  });
+export const eventSchema = z
+  .object({
+    name: z.string().trim().min(1, "Nama Event wajib diisi.").max(200),
+    role: z.string().trim().max(100).default(""),
+    deadline_at: z.iso.datetime({ offset: true }),
+    template: z.enum(templateKeys).optional(),
+  })
+  .strict();
+export const checklistSchema = z
+  .object({
+    event_id: z.uuid("Event tidak valid."),
+    label: z.string().trim().min(1, "Isi item wajib diisi.").max(200),
+    is_completed: z.boolean().default(false),
+    position: z.number().int().min(0).max(1000).optional(),
   })
   .strict();
 export const noteSchema = z
@@ -62,6 +84,7 @@ export const settingsSchema = z
   .object({
     timezone: timezoneSchema,
     academic_module_enabled: z.boolean(),
+    committee_module_enabled: z.boolean(),
     name: z.string().trim().min(1, "Nama wajib diisi.").max(100),
   })
   .strict();

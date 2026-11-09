@@ -26,9 +26,15 @@ export async function GET() {
       .select("*")
       .order("day_of_week")
       .order("start_time"),
+    db.from("events").select("*").order("deadline_at"),
+    db
+      .from("checklist_items")
+      .select("*")
+      .order("position")
+      .order("created_at"),
     db
       .from("settings")
-      .select("timezone,academic_module_enabled")
+      .select("timezone,academic_module_enabled,committee_module_enabled")
       .eq("user_id", user.id)
       .single(),
   ]);
@@ -46,7 +52,9 @@ export async function GET() {
       notes: results[3].data,
       sessions: results[4].data,
       schedule: results[5].data,
-      settings: results[6].data,
+      events: results[6].data,
+      checklist: results[7].data,
+      settings: results[8].data,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );

@@ -11,8 +11,11 @@ import {
   noteSchema,
   sessionSchema,
   scheduleSchema,
+  eventSchema,
+  checklistSchema,
   settingsSchema,
 } from "@/lib/validation";
+import { eventTemplates } from "@/lib/templates";
 import { localDeadline, formatDeadline, dayKey, taskGroups } from "@/lib/time";
 import {
   statuses,
@@ -20,6 +23,7 @@ import {
   type Course,
   type Task,
   type Note,
+  type CommitteeEvent,
   type ScheduleItem,
   weekdays,
   type Workspace,
@@ -27,7 +31,8 @@ import {
 
 type Editor =
   | { kind: "course"; value?: Course }
-  | { kind: "task"; value?: Task; courseId?: string }
+  | { kind: "task"; value?: Task; courseId?: string; eventId?: string }
+  | { kind: "event"; value?: CommitteeEvent }
   | { kind: "note"; value?: Note; courseId?: string }
   | { kind: "schedule"; value?: ScheduleItem; courseId?: string }
   | null;
@@ -53,12 +58,12 @@ function useWorkspace() {
 const nav = [
   ["dashboard", "Dashboard"],
   ["academic", "Mata kuliah"],
+  ["committee", "Kepanitiaan"],
   ["calendar", "Kalender"],
   ["notes", "Catatan"],
   ["focus", "Pomodoro"],
   ["settings", "Pengaturan"],
 ] as const;
-const later = [["committee", "Kepanitiaan"]] as const;
 export default function WorkspaceShell({
   children,
   userId,
@@ -165,6 +170,7 @@ export default function WorkspaceShell({
             name: string;
             timezone: string;
             academic_module_enabled: boolean;
+            committee_module_enabled: boolean;
           };
           return {
             ...current,
@@ -172,6 +178,7 @@ export default function WorkspaceShell({
             settings: {
               timezone: v.timezone,
               academic_module_enabled: v.academic_module_enabled,
+              committee_module_enabled: v.committee_module_enabled,
             },
           };
         }
@@ -197,6 +204,33 @@ export default function WorkspaceShell({
             ? current.schedule.filter((x) => x.course_id !== id)
             : current.schedule;
           return { ...current, courses, notes, sessions, schedule };
+        }
+        if (resource === "events") {
+          // POST returns { event, items }; PATCH returns the event row.
+          if (remove)
+            return {
+              ...current,
+              events: current.events.filter((x) => x.id !== id),
+              checklist: current.checklist.filter((x) => x.event_id !== id),
+            };
+          if (id)
+            return {
+              ...current,
+              events: current.events.map((x) => (x.id === id ? value : x)),
+            };
+          return {
+            ...current,
+            events: [...current.events, value.event],
+            checklist: [...current.checklist, ...value.items],
+          };
+        }
+        if (resource === "checklist_items") {
+          const checklist = remove
+            ? current.checklist.filter((x) => x.id !== id)
+            : id
+              ? current.checklist.map((x) => (x.id === id ? value : x))
+              : [...current.checklist, value];
+          return { ...current, checklist };
         }
         if (resource === "schedule_items") {
           const byTime = (a: ScheduleItem, b: ScheduleItem) =>
@@ -284,7 +318,9 @@ export default function WorkspaceShell({
               ([id]) =>
                 id !== "settings" &&
                 (id !== "academic" ||
-                  data?.settings.academic_module_enabled !== false),
+                  data?.settings.academic_module_enabled !== false) &&
+                (id !== "committee" ||
+                  data?.settings.committee_module_enabled !== false),
             )
             .map(([id, label]) => (
               <Link
@@ -300,16 +336,6 @@ export default function WorkspaceShell({
               </Link>
             ))}
         </nav>
-        <div className="later-nav">
-          <p className="muted small">Nanti di ruangmu</p>
-          {later.map(([id, label]) => (
-            <Link key={id} href={"/" + id}>
-              <Icon name={id} />
-              <span>{label}</span>
-              <span className="later-label">Nanti</span>
-            </Link>
-          ))}
-        </div>
         <div className="sidebar-bottom">
           <Link
             className="settings-link"
@@ -348,8 +374,7 @@ export default function WorkspaceShell({
             <span>Ruangku</span>
             <span className="breadcrumb-divider">/</span>
             <strong>
-              {[...nav, ...later].find(([id]) => path === "/" + id)?.[1] ||
-                "Dashboard"}
+              {nav.find(([id]) => path === "/" + id)?.[1] || "Dashboard"}
             </strong>
           </div>
           <div className="top-actions">
@@ -518,8 +543,14 @@ function TaskRows({
           {board && (
             <div className="task-head">
               <span className="task-course">
-                <span className="source-dot" />
-                {data.courses.find((c) => c.id === task.course_id)?.name}
+                <span
+                  className={
+                    "source-dot " +
+                    (taskContext(data, task).committee ? "committee" : "")
+                  }
+                />
+                {taskContext(data, task).committee && "Panitia · "}
+                {taskContext(data, task).name}
               </span>
               <span className={"priority " + task.priority}>
                 {priorities[task.priority]}
@@ -534,7 +565,7 @@ function TaskRows({
             <span>
               {board
                 ? task.description || "Belum ada deskripsi."
-                : data.courses.find((c) => c.id === task.course_id)?.name}
+                : taskContext(data, task).name}
             </span>
           </button>
           <span className="task-due">
@@ -596,9 +627,28 @@ function TaskRows({
     </Empty>
   );
 }
+// A Task belongs to exactly one Course or Event; name + source label for display.
+function taskContext(data: Workspace, t: Task) {
+  const event = t.event_id && data.events.find((e) => e.id === t.event_id);
+  return event
+    ? { name: event.name, committee: true }
+    : {
+        name: data.courses.find((c) => c.id === t.course_id)?.name,
+        committee: false,
+      };
+}
+// Hiding a module hides its Tasks everywhere without deleting them.
+function visibleTasks(data: Workspace) {
+  return data.tasks.filter((t) =>
+    t.event_id
+      ? data.settings.committee_module_enabled
+      : data.settings.academic_module_enabled,
+  );
+}
 function taskPayload(t: Task) {
   return {
     course_id: t.course_id,
+    event_id: t.event_id,
     title: t.title,
     description: t.description,
     deadline_at: t.deadline_at,
@@ -630,11 +680,16 @@ function SearchDialog({ close }: { close: () => void }) {
             .filter((c) => c.name.toLocaleLowerCase("id").includes(term))
             .slice(0, 5)
         : [],
-    tasks =
-      term && data.settings.academic_module_enabled
-        ? data.tasks
-            .filter((t) => t.title.toLocaleLowerCase("id").includes(term))
-            .slice(0, 6)
+    tasks = term
+      ? visibleTasks(data)
+          .filter((t) => t.title.toLocaleLowerCase("id").includes(term))
+          .slice(0, 6)
+      : [],
+    events =
+      term && data.settings.committee_module_enabled
+        ? data.events
+            .filter((e) => e.name.toLocaleLowerCase("id").includes(term))
+            .slice(0, 5)
         : [];
   return (
     <dialog
@@ -669,7 +724,7 @@ function SearchDialog({ close }: { close: () => void }) {
           <p className="search-hint">
             Mulai dari judul tugas atau mata kuliah yang kamu cari.
           </p>
-        ) : !courses.length && !tasks.length ? (
+        ) : !courses.length && !tasks.length && !events.length ? (
           <p className="search-hint">Belum ada hasil untuk "{query}".</p>
         ) : (
           <>
@@ -691,6 +746,24 @@ function SearchDialog({ close }: { close: () => void }) {
                 <Icon name="arrow" />
               </button>
             ))}
+            {events.length > 0 && <h3>Kepanitiaan</h3>}
+            {events.map((event) => (
+              <button
+                key={event.id}
+                className="search-result"
+                onClick={() => {
+                  router.push("/committee?event=" + event.id);
+                  close();
+                }}
+              >
+                <Icon name="committee" />
+                <span>
+                  <strong>{event.name}</strong>
+                  <small>{event.role || "Event"}</small>
+                </span>
+                <Icon name="arrow" />
+              </button>
+            ))}
             {tasks.length > 0 && <h3>Tugas</h3>}
             {tasks.map((task) => (
               <button
@@ -704,9 +777,7 @@ function SearchDialog({ close }: { close: () => void }) {
                 <Icon name="check" />
                 <span>
                   <strong>{task.title}</strong>
-                  <small>
-                    {data.courses.find((c) => c.id === task.course_id)?.name}
-                  </small>
+                  <small>{taskContext(data, task).name}</small>
                 </span>
                 <Icon name="arrow" />
               </button>
@@ -724,23 +795,7 @@ export function WorkspaceView({ section }: { section: string }) {
   if (section === "academic") return <AcademicView />;
   if (section === "notes") return <NotesView />;
   if (section === "focus") return <FocusView />;
-  if (section !== "dashboard")
-    return (
-      <>
-        <div className="page-heading">
-          <h1>{later.find(([id]) => id === section)?.[1]}</h1>
-        </div>
-        <Empty title="Tahap berikutnya">
-          <p>
-            Fitur ini belum tersedia pada fondasi P0. Untuk saat ini, gunakan
-            Mata kuliah, tugas, dan Kalender.
-          </p>
-          <Link className="primary button" href="/dashboard">
-            Kembali ke Dashboard
-          </Link>
-        </Empty>
-      </>
-    );
+  if (section === "committee") return <CommitteeView />;
   return <Dashboard />;
 }
 function Dashboard() {
@@ -748,16 +803,22 @@ function Dashboard() {
     [filter, setFilter] = useState<"today" | "overdue" | "upcoming" | "done">(
       "today",
     );
-  const groups = taskGroups(data.tasks, data.settings.timezone, now),
-    done = data.tasks.filter((t) => t.status === "done"),
-    total = data.tasks.length;
+  const mine = visibleTasks(data),
+    academic = data.settings.academic_module_enabled,
+    committee = data.settings.committee_module_enabled,
+    hasContent =
+      (academic && data.courses.length > 0) ||
+      (committee && data.events.length > 0);
+  const groups = taskGroups(mine, data.settings.timezone, now),
+    done = mine.filter((t) => t.status === "done"),
+    total = mine.length;
   const zone = data.settings.timezone,
     today = now.setZone(zone),
     [selectedDay, setSelectedDay] = useState(today.toISODate()!);
   const days = Array.from({ length: 7 }, (_, i) =>
     today.startOf("week").plus({ days: i }),
   );
-  const agenda = data.tasks
+  const agenda = mine
     .filter((t) => dayKey(t.deadline_at, zone) === selectedDay)
     .sort((a, b) => a.deadline_at.localeCompare(b.deadline_at));
   const percent = total ? Math.round((done.length / total) * 100) : 0;
@@ -782,33 +843,42 @@ function Dashboard() {
               : "Ruangmu sudah siap. Mulai dari mata kuliah pertamamu."}
           </p>
         </div>
-        {data.settings.academic_module_enabled && data.courses.length > 0 && (
-          <button
-            className="primary"
-            onClick={() =>
-              edit(data.courses.length ? { kind: "task" } : { kind: "course" })
-            }
-          >
+        {hasContent && (
+          <button className="primary" onClick={() => edit({ kind: "task" })}>
             <Icon name="plus" />
-            {data.courses.length ? "Tambah tugas" : "Tambah mata kuliah"}
+            Tambah tugas
           </button>
         )}
       </div>
-      {!data.settings.academic_module_enabled ? (
-        <AcademicOff />
-      ) : !data.courses.length ? (
+      {!academic && !committee ? (
+        <Empty title="Semua modul sedang disembunyikan">
+          <p>Data tetap tersimpan. Aktifkan modul lagi di Pengaturan.</p>
+          <Link className="primary button" href="/settings">
+            Buka Pengaturan
+          </Link>
+        </Empty>
+      ) : !hasContent ? (
         <section className="welcome-start">
           <span className="welcome-symbol">
             <Icon name="academic" />
           </span>
-          <h2>Mulai dari mata kuliah pertamamu.</h2>
+          <h2>
+            {academic
+              ? "Mulai dari mata kuliah pertamamu."
+              : "Mulai dari Event pertamamu."}
+          </h2>
           <p>
             Beri tempat untuk tugas-tugasmu. Deadline yang kamu tambahkan nanti
             akan tersusun di Dashboard dan Kalender.
           </p>
-          <button className="primary" onClick={() => edit({ kind: "course" })}>
+          <button
+            className="primary"
+            onClick={() =>
+              edit(academic ? { kind: "course" } : { kind: "event" })
+            }
+          >
             <Icon name="plus" />
-            Tambah mata kuliah
+            {academic ? "Tambah mata kuliah" : "Tambah Event"}
           </button>
           <div className="onboarding-trail">
             <span>
@@ -892,7 +962,7 @@ function Dashboard() {
                 <div className="week-strip">
                   {days.map((day) => {
                     const key = day.toISODate()!,
-                      count = data.tasks.filter(
+                      count = mine.filter(
                         (t) => dayKey(t.deadline_at, zone) === key,
                       ).length;
                     return (
@@ -946,10 +1016,7 @@ function Dashboard() {
                           <strong>{task.title}</strong>
                           <span>
                             <Icon name="academic" />
-                            {
-                              data.courses.find((c) => c.id === task.course_id)
-                                ?.name
-                            }
+                            {taskContext(data, task).name}
                           </span>
                         </span>
                         <span className="agenda-status">
@@ -1062,53 +1129,52 @@ function Dashboard() {
                   Satu hal dalam satu waktu.
                 </span>
               </section>
-              <section className="panel courses-overview">
-                <div className="panel-heading">
-                  <h2>Mata kuliahmu</h2>
-                  <span>{data.courses.length}</span>
-                </div>
-                {data.courses.length ? (
-                  <div className="course-mini-list">
-                    {data.courses.slice(0, 3).map((course, i) => (
-                      <Link
-                        href={"/academic?course=" + course.id}
-                        key={course.id}
-                      >
-                        <span className={"course-mini-icon color-" + (i % 3)}>
-                          <Icon name="academic" />
-                        </span>
-                        <span>
-                          <strong>{course.name}</strong>
-                          <small>
-                            {
-                              data.tasks.filter(
-                                (t) =>
-                                  t.course_id === course.id &&
-                                  t.status !== "done",
-                              ).length
-                            }{" "}
-                            tugas aktif · {course.credits} SKS
-                          </small>
-                        </span>
-                        <Icon name="arrow" />
-                      </Link>
-                    ))}
+              {academic && (
+                <section className="panel courses-overview">
+                  <div className="panel-heading">
+                    <h2>Mata kuliahmu</h2>
+                    <span>{data.courses.length}</span>
                   </div>
-                ) : (
-                  <p className="course-mini-empty">
-                    Mata kuliah pertamamu akan muncul di sini.
-                  </p>
-                )}
-                <Link href="/academic" className="course-overview-link">
-                  Lihat semua mata kuliah <Icon name="arrow" />
-                </Link>
-              </section>
+                  {data.courses.length ? (
+                    <div className="course-mini-list">
+                      {data.courses.slice(0, 3).map((course, i) => (
+                        <Link
+                          href={"/academic?course=" + course.id}
+                          key={course.id}
+                        >
+                          <span className={"course-mini-icon color-" + (i % 3)}>
+                            <Icon name="academic" />
+                          </span>
+                          <span>
+                            <strong>{course.name}</strong>
+                            <small>
+                              {
+                                data.tasks.filter(
+                                  (t) =>
+                                    t.course_id === course.id &&
+                                    t.status !== "done",
+                                ).length
+                              }{" "}
+                              tugas aktif · {course.credits} SKS
+                            </small>
+                          </span>
+                          <Icon name="arrow" />
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="course-mini-empty">
+                      Mata kuliah pertamamu akan muncul di sini.
+                    </p>
+                  )}
+                  <Link href="/academic" className="course-overview-link">
+                    Lihat semua mata kuliah <Icon name="arrow" />
+                  </Link>
+                </section>
+              )}
               <div className="calendar-note">
                 <Icon name="calendar" />
-                <p>
-                  Jadwal kelas dan integrasi Google Calendar hadir pada tahap
-                  berikutnya.
-                </p>
+                <p>Integrasi Google Calendar hadir pada tahap berikutnya.</p>
               </div>
             </aside>
           </div>
@@ -1128,7 +1194,9 @@ function AcademicView() {
     ),
     [view, setView] = useState<"board" | "list">("board");
   const course = data.courses.find((c) => c.id === courseId),
-    tasks = data.tasks.filter((t) => !courseId || t.course_id === courseId);
+    tasks = data.tasks.filter(
+      (t) => t.course_id && (!courseId || t.course_id === courseId),
+    );
   useEffect(() => {
     const id = searchParams.get("course");
     setCourseId(id && data.courses.some((c) => c.id === id) ? id : "");
@@ -1304,26 +1372,7 @@ function AcademicView() {
           {view === "list" ? (
             <TaskRows tasks={tasks} />
           ) : (
-            <div className="kanban">
-              {Object.entries(statuses).map(([status, label]) => (
-                <section
-                  className={"kanban-column status-" + status}
-                  key={status}
-                >
-                  <h3>
-                    <span className="kanban-status-dot" />
-                    {label}{" "}
-                    <span>
-                      {tasks.filter((t) => t.status === status).length}
-                    </span>
-                  </h3>
-                  <TaskRows
-                    board
-                    tasks={tasks.filter((t) => t.status === status)}
-                  />
-                </section>
-              ))}
-            </div>
+            <KanbanBoard tasks={tasks} />
           )}
         </>
       )}
@@ -1586,6 +1635,276 @@ function FocusView() {
     </>
   );
 }
+function KanbanBoard({ tasks }: { tasks: Task[] }) {
+  return (
+    <div className="kanban">
+      {Object.entries(statuses).map(([status, label]) => (
+        <section className={"kanban-column status-" + status} key={status}>
+          <h3>
+            <span className="kanban-status-dot" />
+            {label}{" "}
+            <span>{tasks.filter((t) => t.status === status).length}</span>
+          </h3>
+          <TaskRows board tasks={tasks.filter((t) => t.status === status)} />
+        </section>
+      ))}
+    </div>
+  );
+}
+function CommitteeView() {
+  const searchParams = useSearchParams(),
+    router = useRouter(),
+    { data, edit, save, notice, busy } = useWorkspace(),
+    zone = data.settings.timezone,
+    event = data.events.find((e) => e.id === searchParams.get("event")),
+    [label, setLabel] = useState(""),
+    [error, setError] = useState("");
+  if (!data.settings.committee_module_enabled)
+    return (
+      <>
+        <h1>Kepanitiaan</h1>
+        <Empty title="Modul Kepanitiaan sedang disembunyikan">
+          <p>Event, checklist, dan tugas Event tetap tersimpan.</p>
+          <Link className="primary button" href="/settings">
+            Buka Pengaturan
+          </Link>
+        </Empty>
+      </>
+    );
+  const eventTasks = (id: string) =>
+      data.tasks.filter((t) => t.event_id === id),
+    items = event ? data.checklist.filter((c) => c.event_id === event.id) : [],
+    doneCount = items.filter((c) => c.is_completed).length;
+  async function addItem(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    try {
+      await save(
+        "checklist_items",
+        checklistSchema.parse({
+          event_id: event!.id,
+          label,
+          position: items.length,
+        }),
+      );
+      setLabel("");
+    } catch (err) {
+      setError(validationMessage(err));
+    }
+  }
+  // COMM-04: Event deadlines and open Event Tasks in one time-ordered list.
+  const deadlines = [
+    ...data.events.map((e) => ({
+      key: "e" + e.id,
+      at: e.deadline_at,
+      title: e.name,
+      kind: "Event",
+      event: e,
+    })),
+    ...data.tasks
+      .filter((t) => t.event_id && t.status !== "done")
+      .map((t) => ({
+        key: "t" + t.id,
+        at: t.deadline_at,
+        title: t.title,
+        kind: "Tugas",
+        event: data.events.find((e) => e.id === t.event_id)!,
+      })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <h1>{event?.name || "Kepanitiaan"}</h1>
+          <p>
+            {event
+              ? `${event.role || "Event"} · deadline ${formatDeadline(event.deadline_at, zone)}`
+              : "Kelola Event, checklist, dan tugas kepanitiaanmu."}
+          </p>
+        </div>
+        <div className="actions">
+          {event && (
+            <button
+              className="secondary"
+              onClick={() => edit({ kind: "event", value: event })}
+            >
+              Edit Event
+            </button>
+          )}
+          <button
+            className="primary"
+            onClick={() =>
+              edit(
+                event ? { kind: "task", eventId: event.id } : { kind: "event" },
+              )
+            }
+          >
+            {event ? "Tambah tugas" : "Tambah Event"}
+          </button>
+        </div>
+      </div>
+      {event ? (
+        <>
+          <button
+            className="text-button back"
+            onClick={() => router.replace("/committee", { scroll: false })}
+          >
+            Kembali ke semua Event
+          </button>
+          <section className="panel checklist-panel">
+            <div className="panel-heading">
+              <h2>Checklist</h2>
+              <span>
+                {doneCount}/{items.length}
+              </span>
+            </div>
+            {items.length ? (
+              <ul className="checklist">
+                {items.map((c) => (
+                  <li key={c.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={c.is_completed}
+                        disabled={busy}
+                        onChange={async () => {
+                          try {
+                            await save(
+                              "checklist_items",
+                              {
+                                event_id: c.event_id,
+                                label: c.label,
+                                is_completed: !c.is_completed,
+                              },
+                              c.id,
+                            );
+                          } catch (err) {
+                            notice((err as Error).message);
+                          }
+                        }}
+                      />
+                      <span className={c.is_completed ? "completed" : ""}>
+                        {c.label}
+                      </span>
+                    </label>
+                    <button
+                      className="text-button"
+                      aria-label={"Hapus item " + c.label}
+                      disabled={busy}
+                      onClick={async () => {
+                        try {
+                          await save("checklist_items", undefined, c.id, true);
+                        } catch (err) {
+                          notice((err as Error).message);
+                        }
+                      }}
+                    >
+                      Hapus
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted small checklist-empty">
+                Belum ada item checklist.
+              </p>
+            )}
+            <form className="checklist-add" onSubmit={addItem}>
+              <input
+                aria-label="Item checklist baru"
+                placeholder="Tambah item checklist…"
+                value={label}
+                maxLength={200}
+                onChange={(e) => setLabel(e.target.value)}
+              />
+              <button className="secondary" disabled={busy}>
+                Tambah item
+              </button>
+            </form>
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+          </section>
+          <div className="section-heading">
+            <h2>Papan tugas</h2>
+          </div>
+          <KanbanBoard tasks={eventTasks(event.id)} />
+        </>
+      ) : data.events.length ? (
+        <>
+          <div className="course-grid">
+            {data.events.map((e) => {
+              const mine = eventTasks(e.id),
+                list = data.checklist.filter((c) => c.event_id === e.id);
+              return (
+                <article className="course" key={e.id}>
+                  <button
+                    className="course-title"
+                    onClick={() =>
+                      router.replace("/committee?event=" + e.id, {
+                        scroll: false,
+                      })
+                    }
+                  >
+                    <span className="course-cover color-3">
+                      <Icon name="committee" />
+                    </span>
+                    <h2>{e.name}</h2>
+                    <p>
+                      {e.role || "Peran belum diisi"} · deadline{" "}
+                      {formatDeadline(e.deadline_at, zone)}
+                    </p>
+                  </button>
+                  <div className="course-meta">
+                    <span>
+                      {mine.filter((t) => t.status !== "done").length} tugas
+                      aktif · checklist{" "}
+                      {list.filter((c) => c.is_completed).length}/{list.length}
+                    </span>
+                    <button
+                      className="text-button"
+                      aria-label={"Edit " + e.name}
+                      onClick={() => edit({ kind: "event", value: e })}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <div className="section-heading">
+            <h2>Deadline kepanitiaan</h2>
+          </div>
+          <div className="task-list">
+            {deadlines.map((d) => (
+              <div className="task-row" key={d.key}>
+                <span>
+                  {formatDeadline(d.at, zone)} · {d.title}
+                </span>
+                <span className="muted small">
+                  {d.kind} · {d.event.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <Empty title="Belum ada Event">
+          <p>
+            Tambahkan Event kepanitiaan, lalu kelola checklist dan tugasnya di
+            sini.
+          </p>
+          <button className="primary" onClick={() => edit({ kind: "event" })}>
+            Tambah Event pertama
+          </button>
+        </Empty>
+      )}
+    </>
+  );
+}
 function ScheduleSection({ course }: { course: Course }) {
   const { data, edit } = useWorkspace(),
     slots = data.schedule.filter((x) => x.course_id === course.id);
@@ -1637,13 +1956,20 @@ function CalendarView() {
   const [month, setMonth] = useState(now.setZone(zone).startOf("month")),
     [selected, setSelected] = useState(now.setZone(zone).toISODate()!);
   const start = month.startOf("week"),
-    tasks = data.tasks
+    committee = data.settings.committee_module_enabled,
+    academic = data.settings.academic_module_enabled,
+    tasks = visibleTasks(data)
       .filter((t) => dayKey(t.deadline_at, zone) === selected)
       .sort((a, b) => a.deadline_at.localeCompare(b.deadline_at)),
-    classes = data.schedule.filter(
-      (x) => x.day_of_week === DateTime.fromISO(selected).weekday,
-    );
-  if (!data.settings.academic_module_enabled)
+    dayEvents = committee
+      ? data.events.filter((e) => dayKey(e.deadline_at, zone) === selected)
+      : [],
+    classes = academic
+      ? data.schedule.filter(
+          (x) => x.day_of_week === DateTime.fromISO(selected).weekday,
+        )
+      : [];
+  if (!academic && !committee)
     return (
       <>
         <h1>Kalender</h1>
@@ -1655,15 +1981,27 @@ function CalendarView() {
       <div className="page-heading">
         <div>
           <h1>Kalender</h1>
-          <p>Deadline dan jadwal kuliah, dalam waktu {zone}.</p>
+          <p>Deadline, jadwal kuliah, dan Event, dalam waktu {zone}.</p>
         </div>
         <button
           className="primary"
           onClick={() =>
-            edit(data.courses.length ? { kind: "task" } : { kind: "course" })
+            edit(
+              (academic && data.courses.length) ||
+                (committee && data.events.length)
+                ? { kind: "task" }
+                : academic
+                  ? { kind: "course" }
+                  : { kind: "event" },
+            )
           }
         >
-          {data.courses.length ? "Tambah tugas" : "Tambah mata kuliah"}
+          {(academic && data.courses.length) ||
+          (committee && data.events.length)
+            ? "Tambah tugas"
+            : academic
+              ? "Tambah mata kuliah"
+              : "Tambah Event"}
         </button>
       </div>
       <div className="calendar-layout">
@@ -1705,9 +2043,14 @@ function CalendarView() {
             {Array.from({ length: 42 }, (_, i) => {
               const day = start.plus({ days: i }),
                 key = day.toISODate()!,
-                items = data.tasks.filter(
+                items = visibleTasks(data).filter(
                   (t) => dayKey(t.deadline_at, zone) === key,
                 ),
+                evs = committee
+                  ? data.events.filter(
+                      (e) => dayKey(e.deadline_at, zone) === key,
+                    )
+                  : [],
                 today = key === now.setZone(zone).toISODate();
               return (
                 <div
@@ -1724,8 +2067,8 @@ function CalendarView() {
                     aria-label={
                       day.setLocale("id").toFormat("d LLLL yyyy") +
                       ", " +
-                      items.length +
-                      " tugas"
+                      (items.length + evs.length) +
+                      " agenda"
                     }
                     aria-pressed={selected === key}
                     onClick={() => setSelected(key)}
@@ -1733,15 +2076,32 @@ function CalendarView() {
                     <span>{day.day}</span>
                   </button>
                   <div className="calendar-items">
-                    {items.slice(0, 2).map((t) => (
+                    {evs.slice(0, 2).map((e) => (
+                      <button
+                        className="calendar-item color-3"
+                        key={e.id}
+                        title={"Panitia · " + e.name}
+                        aria-label={"Detail Event " + e.name}
+                        onClick={() => {
+                          setSelected(key);
+                          edit({ kind: "event", value: e });
+                        }}
+                      >
+                        Panitia · {e.name}
+                      </button>
+                    ))}
+                    {items.slice(0, Math.max(0, 2 - evs.length)).map((t) => (
                       <button
                         className={
                           "calendar-item color-" +
-                          (Math.max(
-                            0,
-                            data.courses.findIndex((c) => c.id === t.course_id),
-                          ) %
-                            3) +
+                          (t.event_id
+                            ? 3
+                            : Math.max(
+                                0,
+                                data.courses.findIndex(
+                                  (c) => c.id === t.course_id,
+                                ),
+                              ) % 3) +
                           " " +
                           (t.status === "done" ? "completed" : "")
                         }
@@ -1756,13 +2116,13 @@ function CalendarView() {
                         {t.title}
                       </button>
                     ))}
-                    {items.length > 2 && (
-                      <small>+{items.length - 2} tugas</small>
+                    {items.length + evs.length > 2 && (
+                      <small>+{items.length + evs.length - 2} agenda</small>
                     )}
                   </div>
-                  {items.length > 0 && (
+                  {items.length + evs.length > 0 && (
                     <span className="calendar-mobile-count" aria-hidden="true">
-                      {items.length} tugas
+                      {items.length + evs.length} agenda
                     </span>
                   )}
                 </div>
@@ -1770,12 +2130,19 @@ function CalendarView() {
             })}
           </div>
           <div className="calendar-legend">
-            {data.courses.map((course, i) => (
-              <span key={course.id}>
-                <i className={"color-" + (i % 3)} />
-                {course.name}
+            {academic &&
+              data.courses.map((course, i) => (
+                <span key={course.id}>
+                  <i className={"color-" + (i % 3)} />
+                  {course.name}
+                </span>
+              ))}
+            {committee && (
+              <span>
+                <i className="color-3" />
+                Kepanitiaan
               </span>
-            ))}
+            )}
           </div>
         </section>
         <section className="daily-agenda">
@@ -1796,6 +2163,30 @@ function CalendarView() {
             Agenda{" "}
             {DateTime.fromISO(selected).setLocale("id").toFormat("d LLLL yyyy")}
           </h2>
+          {dayEvents.length > 0 && (
+            <>
+              <h3>Event</h3>
+              <div className="task-list">
+                {dayEvents.map((e) => (
+                  <div className="task-row" key={e.id}>
+                    <span>
+                      {DateTime.fromISO(e.deadline_at)
+                        .setZone(zone)
+                        .toFormat("HH.mm")}{" "}
+                      · {e.name}
+                      {e.role && " (" + e.role + ")"}
+                    </span>
+                    <Link
+                      className="text-button"
+                      href={"/committee?event=" + e.id}
+                    >
+                      Buka
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           {classes.length > 0 && (
             <>
               <h3>Jadwal kuliah</h3>
@@ -1809,15 +2200,15 @@ function CalendarView() {
                   </div>
                 ))}
               </div>
-              <h3>Deadline</h3>
             </>
           )}
+          {(classes.length > 0 || dayEvents.length > 0) && <h3>Deadline</h3>}
           <TaskRows tasks={tasks} />
         </section>
       </div>
       <p className="muted small">
-        Kalender berisi deadline tugas dan jadwal kuliah mingguan pada agenda
-        harian. Kepanitiaan dan Google Calendar belum tersedia.
+        Kalender berisi deadline tugas, jadwal kuliah mingguan, dan deadline
+        Event pada agenda harian. Google Calendar belum tersedia.
       </p>
     </>
   );
@@ -1834,6 +2225,7 @@ function SettingsView() {
         name: String(f.get("name")),
         timezone: String(f.get("timezone")),
         academic_module_enabled: f.get("academic") === "on",
+        committee_module_enabled: f.get("committee") === "on",
       });
       await save("settings", value);
     } catch (e) {
@@ -1898,6 +2290,17 @@ function SettingsView() {
             <small>Data tetap tersimpan ketika modul disembunyikan.</small>
           </span>
         </label>
+        <label className="toggle">
+          <input
+            name="committee"
+            type="checkbox"
+            defaultChecked={data.settings.committee_module_enabled}
+          />
+          <span>
+            Tampilkan Modul Kepanitiaan
+            <small>Event, checklist, dan tugas Event tetap tersimpan.</small>
+          </span>
+        </label>
         {error && (
           <p className="error" role="alert">
             {error}
@@ -1910,9 +2313,8 @@ function SettingsView() {
       <section className="roadmap">
         <h2>Tahap berikutnya</h2>
         <p>
-          Kepanitiaan, login Google, Google Calendar, dan Gmail belum tersedia.
-          Tidak ada sinkronisasi atau pengiriman email melalui Gmail pada tahap
-          ini.
+          Login Google, Google Calendar, dan Gmail belum tersedia. Tidak ada
+          sinkronisasi atau pengiriman email melalui Gmail pada tahap ini.
         </p>
         <Link href="/forgot-password">Pulihkan password akun</Link>
       </section>
@@ -1954,11 +2356,32 @@ function EditorDialog({
     course = editor.kind === "course" ? editor.value : undefined,
     note = editor.kind === "note" ? editor.value : undefined,
     slot = editor.kind === "schedule" ? editor.value : undefined,
+    committeeEvent = editor.kind === "event" ? editor.value : undefined,
+    academicOn = data.settings.academic_module_enabled,
+    committeeOn = data.settings.committee_module_enabled,
+    // Task context is "course:<id>" or "event:<id>": exactly one parent.
+    ctxDefault =
+      editor.kind !== "task"
+        ? ""
+        : task
+          ? task.event_id
+            ? "event:" + task.event_id
+            : "course:" + task.course_id
+          : editor.eventId
+            ? "event:" + editor.eventId
+            : editor.courseId
+              ? "course:" + editor.courseId
+              : academicOn && data.courses[0]
+                ? "course:" + data.courses[0].id
+                : committeeOn && data.events[0]
+                  ? "event:" + data.events[0].id
+                  : "",
     noun = {
       course: "mata kuliah",
       task: "tugas",
       note: "catatan",
       schedule: "jadwal kuliah",
+      event: "Event",
     }[editor.kind];
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1974,6 +2397,20 @@ function EditorDialog({
             credits: Number(f.get("credits")),
           }),
           course?.id,
+        );
+      else if (editor.kind === "event")
+        await save(
+          "events",
+          eventSchema.parse({
+            name: String(f.get("name")),
+            role: String(f.get("role")),
+            deadline_at: localDeadline(
+              String(f.get("deadline")),
+              data.settings.timezone,
+            ),
+            template: String(f.get("template") || "") || undefined,
+          }),
+          committeeEvent?.id,
         );
       else if (editor.kind === "schedule")
         await save(
@@ -2000,7 +2437,12 @@ function EditorDialog({
           "tasks",
           taskSchema.parse({
             title: String(f.get("title")),
-            course_id: String(f.get("course_id")),
+            course_id: String(f.get("context")).startsWith("course:")
+              ? String(f.get("context")).slice(7)
+              : null,
+            event_id: String(f.get("context")).startsWith("event:")
+              ? String(f.get("context")).slice(6)
+              : null,
             description: String(f.get("description")),
             deadline_at: localDeadline(
               String(f.get("deadline")),
@@ -2025,6 +2467,7 @@ function EditorDialog({
           task: "tasks",
           note: "notes",
           schedule: "schedule_items",
+          event: "events",
         }[editor.kind],
         undefined,
         editor.value!.id,
@@ -2113,6 +2556,56 @@ function EditorDialog({
                     required
                   />
                 </label>
+              </>
+            ) : editor.kind === "event" ? (
+              <>
+                <label>
+                  Nama Event
+                  <input
+                    name="name"
+                    defaultValue={committeeEvent?.name}
+                    required
+                    maxLength={200}
+                  />
+                </label>
+                <label>
+                  Peran kamu (opsional)
+                  <input
+                    name="role"
+                    defaultValue={committeeEvent?.role}
+                    maxLength={100}
+                  />
+                </label>
+                <label>
+                  Deadline ({data.settings.timezone})
+                  <input
+                    name="deadline"
+                    type="datetime-local"
+                    defaultValue={
+                      committeeEvent
+                        ? DateTime.fromISO(committeeEvent.deadline_at)
+                            .setZone(data.settings.timezone)
+                            .toFormat("yyyy-MM-dd'T'HH:mm")
+                        : DateTime.now()
+                            .setZone(data.settings.timezone)
+                            .toISODate() + "T23:59"
+                    }
+                    required
+                  />
+                </label>
+                {!committeeEvent && (
+                  <label>
+                    Template checklist (opsional)
+                    <select name="template" defaultValue="">
+                      <option value="">Tanpa template</option>
+                      {Object.entries(eventTemplates).map(([key, t]) => (
+                        <option key={key} value={key}>
+                          {t.label} ({t.items.length} item)
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </>
             ) : editor.kind === "note" ? (
               <>
@@ -2207,19 +2700,26 @@ function EditorDialog({
                   />
                 </label>
                 <label>
-                  Mata kuliah
-                  <select
-                    name="course_id"
-                    defaultValue={
-                      task?.course_id || editor.courseId || data.courses[0]?.id
-                    }
-                    required
-                  >
-                    {data.courses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
+                  Mata kuliah atau Event
+                  <select name="context" defaultValue={ctxDefault} required>
+                    {academicOn && data.courses.length > 0 && (
+                      <optgroup label="Mata kuliah">
+                        {data.courses.map((c) => (
+                          <option key={c.id} value={"course:" + c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {committeeOn && data.events.length > 0 && (
+                      <optgroup label="Kepanitiaan">
+                        {data.events.map((e) => (
+                          <option key={e.id} value={"event:" + e.id}>
+                            {e.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </label>
                 <label>

@@ -6,8 +6,11 @@ import {
   noteSchema,
   sessionSchema,
   scheduleSchema,
+  eventSchema,
+  checklistSchema,
   settingsSchema,
 } from "./validation";
+import { eventTemplates } from "./templates";
 import { z } from "zod";
 export async function mutate(req: NextRequest, resource: string, id?: string) {
   if (
@@ -17,6 +20,8 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
       "notes",
       "pomodoro_sessions",
       "schedule_items",
+      "events",
+      "checklist_items",
       "settings",
     ].includes(resource)
   )
@@ -59,6 +64,7 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
         p_name: name,
         p_timezone: values.timezone,
         p_academic: values.academic_module_enabled,
+        p_committee: values.committee_module_enabled,
       });
       if (result.error) throw result.error;
       return NextResponse.json({ ok: true });
@@ -89,7 +95,11 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
             ? sessionSchema
             : resource === "schedule_items"
               ? scheduleSchema
-              : taskSchema;
+              : resource === "events"
+                ? eventSchema
+                : resource === "checklist_items"
+                  ? checklistSchema
+                  : taskSchema;
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success)
       return NextResponse.json(
@@ -98,19 +108,38 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
       );
     if (req.method === "PATCH" && !id)
       return NextResponse.json({ error: "ID wajib diisi." }, { status: 400 });
+    if (resource === "events" && req.method === "POST") {
+      const { template, ...e } = parsed.data as z.infer<typeof eventSchema>;
+      const created = await db.rpc("create_event", {
+        p_name: e.name,
+        p_role: e.role,
+        p_deadline: e.deadline_at,
+        p_items: template ? [...eventTemplates[template].items] : [],
+      });
+      if (created.error) throw created.error;
+      return NextResponse.json(created.data, { status: 201 });
+    }
+    const values: Record<string, unknown> = { ...parsed.data };
+    delete values.template; // only used when an event is created
+    if (resource === "checklist_items" && req.method === "PATCH") {
+      delete values.event_id; // not updatable
+      delete values.position;
+    }
     const result =
       req.method === "POST"
         ? await db
             .from(resource)
             .insert({
-              ...parsed.data,
-              ...(resource === "tasks" ? {} : { user_id: user.id }),
+              ...values,
+              ...(resource === "tasks" || resource === "checklist_items"
+                ? {}
+                : { user_id: user.id }),
             } as Record<string, unknown>)
             .select()
             .single()
         : await db
             .from(resource)
-            .update(parsed.data)
+            .update(values)
             .eq("id", id!)
             .select()
             .maybeSingle();
@@ -125,6 +154,14 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
     });
   } catch (err) {
     const code = (err as { code?: string }).code;
+    if (code === "23503" && resource === "events")
+      return NextResponse.json(
+        {
+          error:
+            "Event masih memiliki tugas. Hapus atau pindahkan tugas terlebih dahulu.",
+        },
+        { status: 409 },
+      );
     if (code === "23503" && resource === "courses")
       return NextResponse.json(
         {

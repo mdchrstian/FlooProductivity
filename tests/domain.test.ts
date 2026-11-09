@@ -7,14 +7,18 @@ import {
   noteSchema,
   sessionSchema,
   scheduleSchema,
+  eventSchema,
+  checklistSchema,
   settingsSchema,
   registrationSchema,
 } from "../src/lib/validation";
 import { localDeadline, dayKey, taskGroups } from "../src/lib/time";
+import { eventTemplates } from "../src/lib/templates";
 import type { Task } from "../src/lib/types";
 const task: Task = {
   id: "x",
   course_id: "7a6c61e0-9d80-41e3-bddc-6877f40d2207",
+  event_id: null,
   title: "Makalah",
   description: "",
   deadline_at: "2026-12-31T16:00:00Z",
@@ -165,4 +169,50 @@ test("Schedule slot needs a valid weekday, HH:MM times and end after start", () 
     { user_id: course_id },
   ])
     assert.equal(scheduleSchema.safeParse({ ...ok, ...bad }).success, false);
+});
+test("Task belongs to exactly one Course or Event", () => {
+  const { id, ...payload } = task;
+  const eventId = "0f1d5b6a-5c4e-4b1b-9d0a-2f6c1f6f7a11";
+  assert.equal(taskSchema.safeParse(payload).success, true);
+  assert.equal(
+    taskSchema.safeParse({ ...payload, course_id: null, event_id: eventId })
+      .success,
+    true,
+  );
+  assert.equal(
+    taskSchema.safeParse({ ...payload, event_id: eventId }).success,
+    false,
+  );
+  assert.equal(
+    taskSchema.safeParse({ ...payload, course_id: null }).success,
+    false,
+  );
+});
+test("Event and checklist input limits, templates are chosen by key", () => {
+  const eventId = "0f1d5b6a-5c4e-4b1b-9d0a-2f6c1f6f7a11";
+  const ok = { name: "Seminar", deadline_at: "2026-12-31T16:00:00Z" };
+  assert.equal(eventSchema.safeParse(ok).success, true);
+  assert.equal(
+    eventSchema.safeParse({ ...ok, template: "seminar" }).success,
+    true,
+  );
+  for (const bad of [
+    { name: " " },
+    { name: "x".repeat(201) },
+    { template: "unknown" },
+    { deadline_at: "besok" },
+    { user_id: eventId },
+  ])
+    assert.equal(eventSchema.safeParse({ ...ok, ...bad }).success, false);
+  const item = { event_id: eventId, label: "Pesan tempat" };
+  assert.equal(checklistSchema.parse(item).is_completed, false);
+  assert.equal(
+    checklistSchema.safeParse({ ...item, label: " " }).success,
+    false,
+  );
+  for (const t of Object.values(eventTemplates)) {
+    assert.ok(t.items.length >= 1 && t.items.length <= 20);
+    for (const label of t.items)
+      assert.ok(label.length >= 1 && label.length <= 200);
+  }
 });
