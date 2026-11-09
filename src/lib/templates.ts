@@ -1,5 +1,6 @@
+import { committeeTemplates, type Template } from "./udayana";
 // Starter checklists chosen by key, so the client can never send its own item list.
-export const eventTemplates = {
+const generic = {
   seminar: {
     label: "Seminar",
     items: [
@@ -30,9 +31,13 @@ export const eventTemplates = {
       "Buat laporan kegiatan",
     ],
   },
-} as const;
-export type TemplateKey = keyof typeof eventTemplates;
+} satisfies Record<string, Template>;
+export const eventTemplates: Record<string, Template> = {
+  ...generic,
+  ...committeeTemplates,
+};
+export type TemplateKey = string;
 export const templateKeys = Object.keys(eventTemplates) as [
-  TemplateKey,
-  ...TemplateKey[],
+  string,
+  ...string[],
 ];

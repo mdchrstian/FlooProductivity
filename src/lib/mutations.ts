@@ -4,13 +4,16 @@ import {
   courseSchema,
   taskSchema,
   noteSchema,
+  dailySchema,
   sessionSchema,
   scheduleSchema,
   eventSchema,
   checklistSchema,
   settingsSchema,
+  curriculumSchema,
 } from "./validation";
 import { eventTemplates } from "./templates";
+import { curriculum } from "./udayana";
 import { z } from "zod";
 export async function mutate(req: NextRequest, resource: string, id?: string) {
   if (
@@ -18,6 +21,7 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
       "courses",
       "tasks",
       "notes",
+      "daily_tasks",
       "pomodoro_sessions",
       "schedule_items",
       "events",
@@ -65,6 +69,8 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
         p_timezone: values.timezone,
         p_academic: values.academic_module_enabled,
         p_committee: values.committee_module_enabled,
+        p_udayana: values.udayana_student,
+        p_semester: values.semester,
       });
       if (result.error) throw result.error;
       return NextResponse.json({ ok: true });
@@ -86,20 +92,47 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
         );
       return NextResponse.json({ ok: true });
     }
+    if (resource === "courses" && req.method === "POST") {
+      const body = await req.clone().json();
+      if (body && "curriculum_semester" in body) {
+        const cur = curriculumSchema.safeParse(body);
+        if (!cur.success)
+          return NextResponse.json(
+            { error: "Semester kurikulum tidak valid." },
+            { status: 400 },
+          );
+        const own = await db.from("courses").select("name");
+        if (own.error) throw own.error;
+        const have = new Set(own.data.map((c) => c.name.trim().toLowerCase()));
+        const rows = curriculum
+          .filter(
+            (c) =>
+              c.semester === cur.data.curriculum_semester &&
+              !have.has(c.name.toLowerCase()),
+          )
+          .map((c) => ({ name: c.name, credits: c.credits, user_id: user.id }));
+        if (!rows.length) return NextResponse.json([], { status: 200 });
+        const added = await db.from("courses").insert(rows).select();
+        if (added.error) throw added.error;
+        return NextResponse.json(added.data, { status: 201 });
+      }
+    }
     const schema =
       resource === "courses"
         ? courseSchema
         : resource === "notes"
           ? noteSchema
-          : resource === "pomodoro_sessions"
-            ? sessionSchema
-            : resource === "schedule_items"
-              ? scheduleSchema
-              : resource === "events"
-                ? eventSchema
-                : resource === "checklist_items"
-                  ? checklistSchema
-                  : taskSchema;
+          : resource === "daily_tasks"
+            ? dailySchema
+            : resource === "pomodoro_sessions"
+              ? sessionSchema
+              : resource === "schedule_items"
+                ? scheduleSchema
+                : resource === "events"
+                  ? eventSchema
+                  : resource === "checklist_items"
+                    ? checklistSchema
+                    : taskSchema;
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success)
       return NextResponse.json(
@@ -112,7 +145,7 @@ export async function mutate(req: NextRequest, resource: string, id?: string) {
       const { template, ...e } = parsed.data as z.infer<typeof eventSchema>;
       const created = await db.rpc("create_event", {
         p_name: e.name,
-        p_role: e.role,
+        p_role: e.role || (template && eventTemplates[template].role) || "",
         p_deadline: e.deadline_at,
         p_items: template ? [...eventTemplates[template].items] : [],
       });

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { browserClient } from "@/lib/supabase/browser";
 import { registrationSchema } from "@/lib/validation";
+import { isHimaif, verifyQuestion } from "@/lib/udayana";
 export default function AuthForm({
   mode,
 }: {
@@ -10,7 +11,8 @@ export default function AuthForm({
 }) {
   const [error, setError] = useState(""),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [student, setStudent] = useState(false);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("error") === "link")
       setError("Tautan tidak valid atau sudah kedaluwarsa. Minta tautan baru.");
@@ -23,6 +25,14 @@ export default function AuthForm({
     forgot: "Pulihkan password",
     reset: "Password baru",
   };
+  async function google() {
+    setError("");
+    const { error } = await browserClient().auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin + "/auth/confirm" },
+    });
+    if (error) setError("Login Google belum dapat digunakan. Coba lagi nanti.");
+  }
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -41,8 +51,21 @@ export default function AuthForm({
               password,
               confirm,
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              udayana_student: values.get("udayana") === "on",
+              semester:
+                values.get("udayana") === "on"
+                  ? Number(values.get("semester")) || null
+                  : null,
             })
           : null;
+      if (
+        mode === "register" &&
+        values.get("udayana") === "on" &&
+        !isHimaif(String(values.get("verify") || ""))
+      )
+        throw new Error(
+          "Jawaban pertanyaan verifikasi salah. Lepas centang Udayana jika kamu bukan mahasiswa Informatika Udayana.",
+        );
       if (mode === "reset" && (password.length < 8 || password !== confirm))
         throw new Error(
           password.length < 8
@@ -64,7 +87,12 @@ export default function AuthForm({
           email: data.email,
           password: data.password,
           options: {
-            data: { name: data.name, timezone: data.timezone },
+            data: {
+              name: data.name,
+              timezone: data.timezone,
+              udayana_student: data.udayana_student,
+              semester: data.semester,
+            },
             emailRedirectTo: origin + "/auth/confirm",
           },
         });
@@ -189,6 +217,42 @@ export default function AuthForm({
                 />
               </label>
             )}
+            {mode === "register" && (
+              <>
+                <label className="toggle">
+                  <input
+                    name="udayana"
+                    type="checkbox"
+                    checked={student}
+                    onChange={(e) => setStudent(e.target.checked)}
+                  />
+                  <span>
+                    Saya mahasiswa aktif Informatika Universitas Udayana
+                  </span>
+                </label>
+                {student && (
+                  <label>
+                    {verifyQuestion}
+                    <input name="verify" autoComplete="off" required />
+                  </label>
+                )}
+                {student && (
+                  <label>
+                    Semester
+                    <select name="semester" defaultValue="" required>
+                      <option value="" disabled>
+                        Pilih semester
+                      </option>
+                      {Array.from({ length: 14 }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={n}>
+                          Semester {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            )}
             {error && (
               <p role="alert" className="error">
                 {error}
@@ -211,6 +275,16 @@ export default function AuthForm({
                       : "Simpan password"}
             </button>
           </form>
+          {(mode === "login" || mode === "register") && (
+            <button
+              type="button"
+              className="secondary full"
+              disabled={!ready}
+              onClick={google}
+            >
+              Masuk dengan Google
+            </button>
+          )}
           <div className="auth-links">
             {mode === "login" ? (
               <>
@@ -223,7 +297,6 @@ export default function AuthForm({
               <Link href="/login">Kembali ke halaman masuk</Link>
             )}
           </div>
-          <p className="muted small">Login Google: tahap berikutnya.</p>
         </div>
       </section>
     </main>

@@ -45,6 +45,13 @@ export const checklistSchema = z
     position: z.number().int().min(0).max(1000).optional(),
   })
   .strict();
+export const dailySchema = z
+  .object({
+    title: z.string().trim().min(1, "Judul wajib diisi.").max(200),
+    due_date: z.iso.date("Tanggal tidak valid.").nullable().default(null),
+    is_done: z.boolean().default(false),
+  })
+  .strict();
 export const noteSchema = z
   .object({
     content: z
@@ -80,14 +87,29 @@ export const scheduleSchema = z
     message: "Jam selesai harus setelah jam mulai.",
     path: ["end_time"],
   });
+const studentFields = {
+  udayana_student: z.boolean(),
+  semester: z.number().int().min(1).max(14).nullable(),
+};
+const studentOk = (v: { udayana_student: boolean; semester: number | null }) =>
+  v.udayana_student === (v.semester !== null);
+const studentIssue = {
+  message: "Pilih semester untuk mahasiswa Informatika Udayana.",
+  path: ["semester"],
+};
+export const curriculumSchema = z
+  .object({ curriculum_semester: z.number().int().min(1).max(4) })
+  .strict();
 export const settingsSchema = z
   .object({
     timezone: timezoneSchema,
     academic_module_enabled: z.boolean(),
     committee_module_enabled: z.boolean(),
     name: z.string().trim().min(1, "Nama wajib diisi.").max(100),
+    ...studentFields,
   })
-  .strict();
+  .strict()
+  .refine(studentOk, studentIssue);
 export const registrationSchema = z
   .object({
     name: z.string().trim().min(1, "Nama wajib diisi.").max(100),
@@ -95,7 +117,9 @@ export const registrationSchema = z
     password: z.string().min(8, "Password minimal 8 karakter."),
     confirm: z.string(),
     timezone: timezoneSchema,
+    ...studentFields,
   })
+  .refine(studentOk, studentIssue)
   .refine((v) => v.password === v.confirm, {
     message: "Konfirmasi password tidak sama.",
     path: ["confirm"],

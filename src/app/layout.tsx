@@ -10,8 +10,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // suppressHydrationWarning: browser extensions (e.g. translators) add classes to <html> before React hydrates.
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

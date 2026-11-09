@@ -1,6 +1,7 @@
 const icons = {
   dashboard:
     '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  daily: '<path d="m4 7 2 2 3-3M4 17l2 2 3-3M13 8h8M13 18h8"/>',
   academic: '<path d="m2 8 10-5 10 5-10 5zM6 10v7c4 3 8 3 12 0v-7M22 8v8"/>',
   committee:
     '<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12h18M9 12v3h6v-3"/>',

@@ -81,3 +81,24 @@ Dijalankan: `tsc --noEmit`, `next build --webpack`, `npm test` (14 lulus), migra
 Uji browser (akun A, hosted): Event tanpa template (0 item) dan dengan template Seminar (5 item berurutan); centang checklist dan tambah item (posisi setelah item template) bertahan di database; Task Event tersimpan dengan `course_id` kosong dan `event_id` terisi, kartu berlabel "Panitia ·", status berpindah di Kanban dan tersimpan; Dashboard dan Kalender menampilkan Task serta deadline Event dengan warna dan label sumber; hapus Event yang masih punya Task ditolak dengan pesan; toggle Modul Kepanitiaan mati menyembunyikan menu, Dashboard, Kalender, dan halaman Kepanitiaan tanpa menghapus data, lalu menyala kembali dengan 3 Event, 11 item checklist, dan 1 Task utuh; Task Course tetap berjumlah 5 aktif; lebar 375 px tanpa overflow. Data uji (berawalan "Uji") dihapus; Event "INVENTION" milik pengguna tidak disentuh.
 
 Belum dijalankan: uji browser akun B, lebar desktop lebar, hapus Event tanpa Task lewat UI (hanya lewat uji integrasi dan pembersihan), mengubah Task antara Course dan Event lewat editor, pencarian Event (Cmd+K), Modul Akademik mati saat Kepanitiaan menyala, edit/hapus item checklist selain hapus lewat uji, dan kasus pembuatan Event dengan template yang gagal sebagian (dijamin satu transaksi oleh `create_event`, hanya diuji lewat integrasi). Tidak ada penghubung catatan ke Event.
+
+## Udayana sign-up, kurikulum, template kepanitiaan, login Google
+
+Status: migration `202611130001_udayana.sql` sudah diterapkan ke hosted (SQL Editor). Uji integrasi 22/22 lulus, termasuk blok Udayana (simpan, tolak semester 20, semester dikosongkan saat bukan mahasiswa). Uji browser (akun Uji A, data uji dibersihkan setelahnya) lulus: form daftar (toggle memunculkan semester), Pengaturan (semester wajib; simpan Udayana semester 2), tombol "Tambah mata kuliah semester 2" (9 ditambahkan, klik kedua 0), pemilih kurikulum mengisi nama dan SKS, grup template di editor Event (10/7/7/10 Sie), Event "Uji WEBNAS" dari template mendapat peran "Sie Acara" dan 6 item checklist.
+
+- Lulus: `tsc --noEmit`, `npm test` (17 unit test: SKS per semester 21/21/21/20, 34 template Sie muat batas 20 item dan 200 karakter, aturan semester pada skema), `next build --webpack`.
+- Belum diuji: trigger sign-up dengan metadata Udayana (butuh daftar akun nyata) dan akun B di UI.
+- Catatan: pengecekan duplikat memakai nama persis, jadi mata kuliah buatan sendiri dengan ejaan beda (mis. "Interaksi Manusia & Komputer") tidak dianggap sudah ada.
+- Google: pemilik mengisi Google Cloud dan provider Supabase, lalu melaporkan login Google berhasil (dicoba sendiri oleh pemilik, tidak diamati oleh Claude). Belum dicek: nama dari akun Google terisi benar di profil, dan pengguna Google baru mendapat Pengaturan bawaan (bukan mahasiswa Udayana).
+- Batas: kurikulum hanya semester 1-4 (data yang diberikan); semester lebih tinggi hanya menyimpan status. Template kepanitiaan tidak diblokir server untuk non-mahasiswa Udayana (hanya disembunyikan di UI).
+
+### Pertanyaan verifikasi dan logo Event
+- Opsi Udayana (daftar dan Pengaturan) meminta jawaban "HIMAIF" (tanpa beda huruf besar/kecil dan spasi). Lulus di browser: jawaban salah ditolak dan tidak tersimpan, jawaban benar tersimpan; akun dikembalikan ke semula.
+- Batas: ini pagar ringan di sisi klien. Siapa pun yang memanggil API langsung bisa melewatinya. Form daftar belum diuji end-to-end (butuh sign-up nyata).
+- Logo (`public/committee/*.jpg`) tampil di kartu Event bila nama Event memuat invention, webnas, mengajar, atau supremasi. Hanya INVENTION yang terlihat di akun uji; tiga logo lain belum dilihat di layar. Penetapan gambar 2 ke Informatika Mengajar dan gambar 3 ke WEBNAS adalah tebakan dari isi gambar.
+
+## Harian (tugas ringan tanpa mata kuliah/Event)
+- Migration `202611140001_daily.sql` diterapkan ke hosted. Tabel `daily_tasks` (user_id, judul, tanggal opsional, selesai), RLS pemilik saja.
+- Lulus di browser (akun Uji A, data "Uji" dihapus): tambah dengan dan tanpa tanggal, label "Hari ini" dan "Terlambat", centang memindahkan ke "N selesai" dan tersimpan, hapus, tampilan desktop dan sempit.
+- Lulus: `tsc`, 18 unit test (skema harian).
+- Belum diuji: isolasi akun B untuk `daily_tasks` (tidak ada di `test-integration.ts`), edit judul (hanya tambah, centang, hapus). Tugas harian belum tampil di Dashboard, Kalender, atau pencarian.

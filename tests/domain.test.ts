@@ -60,6 +60,8 @@ test("Registration checks confirmation and minimum password", () => {
     password: "password1",
     confirm: "password1",
     timezone: "Asia/Makassar",
+    udayana_student: false,
+    semester: null,
   };
   assert.equal(registrationSchema.safeParse(base).success, true);
   assert.equal(
@@ -215,4 +217,66 @@ test("Event and checklist input limits, templates are chosen by key", () => {
     for (const label of t.items)
       assert.ok(label.length >= 1 && label.length <= 200);
   }
+});
+
+import { curriculum } from "../src/lib/udayana";
+test("curriculum credits per semester", () => {
+  const sks = (s: number) =>
+    curriculum
+      .filter((c) => c.semester === s)
+      .reduce((n, c) => n + c.credits, 0);
+  assert.deepEqual([1, 2, 3, 4].map(sks), [21, 21, 21, 20]);
+});
+test("every template fits the 20-item and 200-char limits", () => {
+  for (const [k, t] of Object.entries(eventTemplates)) {
+    assert.ok(t.items.length <= 20, k);
+    assert.ok(
+      t.items.every((i) => i.length <= 200),
+      k,
+    );
+  }
+  assert.equal(Object.values(eventTemplates).filter((t) => t.group).length, 34);
+});
+test("semester is required only for Udayana students", () => {
+  const base = { name: "A", timezone: "UTC", timezone_: 0 };
+  const s = {
+    name: "A",
+    timezone: "UTC",
+    academic_module_enabled: true,
+    committee_module_enabled: true,
+  };
+  assert.ok(
+    !settingsSchema.safeParse({ ...s, udayana_student: true, semester: null })
+      .success,
+  );
+  assert.ok(
+    !settingsSchema.safeParse({ ...s, udayana_student: false, semester: 3 })
+      .success,
+  );
+  assert.ok(
+    settingsSchema.safeParse({ ...s, udayana_student: true, semester: 3 })
+      .success,
+  );
+  assert.ok(
+    registrationSchema.safeParse({
+      name: "A",
+      email: "a@b.co",
+      password: "12345678",
+      confirm: "12345678",
+      timezone: "UTC",
+      udayana_student: false,
+      semester: null,
+    }).success,
+  );
+  void base;
+});
+
+import { dailySchema } from "../src/lib/validation";
+test("daily task needs a title and a valid optional date", () => {
+  assert.ok(dailySchema.safeParse({ title: "Fotokopi KRS" }).success);
+  assert.ok(
+    dailySchema.safeParse({ title: "A", due_date: "2026-11-20" }).success,
+  );
+  assert.ok(!dailySchema.safeParse({ title: "  " }).success);
+  assert.ok(!dailySchema.safeParse({ title: "A", due_date: "besok" }).success);
 });

@@ -684,6 +684,8 @@ await check(
         p_timezone: prefs.timezone,
         p_academic: prefs.academic_module_enabled,
         p_committee: committee,
+        p_udayana: false,
+        p_semester: null,
       });
     assert.equal((await set(!prefs.committee_module_enabled)).error, null);
     assert.equal(
@@ -697,6 +699,29 @@ await check(
       !prefs.committee_module_enabled,
     );
     assert.equal((await set(prefs.committee_module_enabled)).error, null);
+    // Udayana profile: round-trip, semester dropped when not a student, out-of-range rejected
+    const stu = (udayana: boolean, semester: number | null) =>
+      a.rpc("update_preferences", {
+        p_name: name,
+        p_timezone: prefs.timezone,
+        p_academic: prefs.academic_module_enabled,
+        p_committee: prefs.committee_module_enabled,
+        p_udayana: udayana,
+        p_semester: semester,
+      });
+    const read = async () =>
+      (
+        await a
+          .from("settings")
+          .select("udayana_student,semester")
+          .eq("user_id", uidA)
+          .single()
+      ).data;
+    assert.equal((await stu(true, 3)).error, null);
+    assert.deepEqual(await read(), { udayana_student: true, semester: 3 });
+    assert.notEqual((await stu(true, 20)).error, null);
+    assert.equal((await stu(false, 5)).error, null);
+    assert.deepEqual(await read(), { udayana_student: false, semester: null });
     return "Isolasi, tepat-satu-konteks, RESTRICT, CASCADE checklist, create_event atomik, dan toggle lulus.";
   },
 );
@@ -736,6 +761,8 @@ await check(
           p_timezone: "Asia/Makassar",
           p_academic: false,
           p_committee: true,
+          p_udayana: false,
+          p_semester: null,
         })
       ).error,
       null,
@@ -752,6 +779,8 @@ await check(
           p_timezone: "Invalid/Zone",
           p_academic: true,
           p_committee: true,
+          p_udayana: false,
+          p_semester: null,
         })
       ).error,
     );
@@ -764,6 +793,8 @@ await check(
       p_timezone: "Asia/Makassar",
       p_academic: true,
       p_committee: true,
+      p_udayana: false,
+      p_semester: null,
     });
     return "Perubahan valid tersimpan; transaksi invalid rollback.";
   },

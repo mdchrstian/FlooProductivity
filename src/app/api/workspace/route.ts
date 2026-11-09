@@ -17,6 +17,10 @@ export async function GET() {
     db.from("tasks").select("*").order("deadline_at"),
     db.from("notes").select("*").order("created_at", { ascending: false }),
     db
+      .from("daily_tasks")
+      .select("id,title,due_date,is_done")
+      .order("created_at"),
+    db
       .from("pomodoro_sessions")
       .select("*")
       .order("created_at", { ascending: false })
@@ -34,7 +38,9 @@ export async function GET() {
       .order("created_at"),
     db
       .from("settings")
-      .select("timezone,academic_module_enabled,committee_module_enabled")
+      .select(
+        "timezone,academic_module_enabled,committee_module_enabled,udayana_student,semester",
+      )
       .eq("user_id", user.id)
       .single(),
   ]);
@@ -50,11 +56,12 @@ export async function GET() {
       courses: results[1].data,
       tasks: results[2].data,
       notes: results[3].data,
-      sessions: results[4].data,
-      schedule: results[5].data,
-      events: results[6].data,
-      checklist: results[7].data,
-      settings: results[8].data,
+      daily: results[4].data,
+      sessions: results[5].data,
+      schedule: results[6].data,
+      events: results[7].data,
+      checklist: results[8].data,
+      settings: results[9].data,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );

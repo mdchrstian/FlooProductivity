@@ -13,9 +13,17 @@ import {
   scheduleSchema,
   eventSchema,
   checklistSchema,
+  dailySchema,
   settingsSchema,
 } from "@/lib/validation";
 import { eventTemplates } from "@/lib/templates";
+import {
+  committeeLogo,
+  curriculum,
+  curriculumSemesters,
+  isHimaif,
+  verifyQuestion,
+} from "@/lib/udayana";
 import { localDeadline, formatDeadline, dayKey, taskGroups } from "@/lib/time";
 import {
   statuses,
@@ -57,6 +65,7 @@ function useWorkspace() {
 }
 const nav = [
   ["dashboard", "Dashboard"],
+  ["daily", "Harian"],
   ["academic", "Mata kuliah"],
   ["committee", "Kepanitiaan"],
   ["calendar", "Kalender"],
@@ -171,6 +180,8 @@ export default function WorkspaceShell({
             timezone: string;
             academic_module_enabled: boolean;
             committee_module_enabled: boolean;
+            udayana_student: boolean;
+            semester: number | null;
           };
           return {
             ...current,
@@ -179,6 +190,8 @@ export default function WorkspaceShell({
               timezone: v.timezone,
               academic_module_enabled: v.academic_module_enabled,
               committee_module_enabled: v.committee_module_enabled,
+              udayana_student: v.udayana_student,
+              semester: v.semester,
             },
           };
         }
@@ -187,7 +200,10 @@ export default function WorkspaceShell({
             ? current.courses.filter((c) => c.id !== id)
             : id
               ? current.courses.map((c) => (c.id === id ? value : c))
-              : [...current.courses, value];
+              : [
+                  ...current.courses,
+                  ...(Array.isArray(value) ? value : [value]),
+                ];
           // Mirrors ON DELETE SET NULL so linked notes stay without a reload.
           const notes = remove
             ? current.notes.map((n) =>
@@ -249,6 +265,14 @@ export default function WorkspaceShell({
             : [value, ...current.sessions];
           return { ...current, sessions };
         }
+        if (resource === "daily_tasks") {
+          const daily = remove
+            ? current.daily.filter((d) => d.id !== id)
+            : id
+              ? current.daily.map((d) => (d.id === id ? value : d))
+              : [...current.daily, value];
+          return { ...current, daily };
+        }
         if (resource === "notes") {
           const notes = remove
             ? current.notes.filter((n) => n.id !== id)
@@ -264,7 +288,15 @@ export default function WorkspaceShell({
             : [...current.tasks, value];
         return { ...current, tasks };
       });
-      setMessage(remove ? "Data dihapus." : "Perubahan tersimpan.");
+      setMessage(
+        remove
+          ? "Data dihapus."
+          : Array.isArray(value)
+            ? value.length
+              ? value.length + " mata kuliah ditambahkan."
+              : "Semua mata kuliah semester ini sudah ada."
+            : "Perubahan tersimpan.",
+      );
     } catch (e) {
       throw new Error(
         (e as Error).message.includes("fetch")
@@ -793,6 +825,7 @@ export function WorkspaceView({ section }: { section: string }) {
   if (section === "settings") return <SettingsView />;
   if (section === "calendar") return <CalendarView />;
   if (section === "academic") return <AcademicView />;
+  if (section === "daily") return <DailyView />;
   if (section === "notes") return <NotesView />;
   if (section === "focus") return <FocusView />;
   if (section === "committee") return <CommitteeView />;
@@ -1192,7 +1225,10 @@ function AcademicView() {
         ? searchParams.get("course")!
         : "",
     ),
-    [view, setView] = useState<"board" | "list">("board");
+    [view, setView] = useState<"board" | "list">("board"),
+    [curError, setCurError] = useState(""),
+    { save, busy } = useWorkspace();
+  const sem = data.settings.udayana_student ? data.settings.semester : null;
   const course = data.courses.find((c) => c.id === courseId),
     tasks = data.tasks.filter(
       (t) => t.course_id && (!courseId || t.course_id === courseId),
@@ -1243,6 +1279,22 @@ function AcademicView() {
               Edit mata kuliah
             </button>
           )}
+          {!course && sem !== null && sem <= 4 && (
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={async () => {
+                setCurError("");
+                try {
+                  await save("courses", { curriculum_semester: sem });
+                } catch (e) {
+                  setCurError((e as Error).message);
+                }
+              }}
+            >
+              Tambah mata kuliah semester {sem}
+            </button>
+          )}
           <button
             className="primary"
             onClick={() =>
@@ -1257,6 +1309,11 @@ function AcademicView() {
           </button>
         </div>
       </div>
+      {curError && (
+        <p className="error" role="alert">
+          {curError}
+        </p>
+      )}
       {course ? (
         <button className="text-button back" onClick={() => chooseCourse("")}>
           Kembali ke semua mata kuliah
@@ -1374,6 +1431,146 @@ function AcademicView() {
           ) : (
             <KanbanBoard tasks={tasks} />
           )}
+        </>
+      )}
+    </>
+  );
+}
+function DailyView() {
+  const { data, save, busy, notice } = useWorkspace(),
+    zone = data.settings.timezone,
+    today = DateTime.now().setZone(zone).toISODate()!,
+    [error, setError] = useState(""),
+    [showDone, setShowDone] = useState(false);
+  const open = data.daily
+      .filter((d) => !d.is_done)
+      .sort((a, b) =>
+        (a.due_date || "9999").localeCompare(b.due_date || "9999"),
+      ),
+    done = data.daily.filter((d) => d.is_done);
+  async function run(p: Promise<void>) {
+    try {
+      await p;
+    } catch (e) {
+      notice((e as Error).message);
+    }
+  }
+  async function add(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    setError("");
+    const form = e.currentTarget,
+      f = new FormData(form);
+    try {
+      await save(
+        "daily_tasks",
+        dailySchema.parse({
+          title: String(f.get("title")),
+          due_date: String(f.get("due")) || null,
+        }),
+      );
+      form.reset();
+    } catch (err) {
+      setError(validationMessage(err));
+    }
+  }
+  const label = (d: string) =>
+    d === today
+      ? "Hari ini"
+      : d < today
+        ? "Terlambat · " + DateTime.fromISO(d).setLocale("id").toFormat("d LLL")
+        : DateTime.fromISO(d).setLocale("id").toFormat("d LLL");
+  const row = (d: (typeof data.daily)[number]) => (
+    <div
+      className={"task-row daily-row " + (d.is_done ? "completed" : "")}
+      key={d.id}
+    >
+      <input
+        className="task-check"
+        type="checkbox"
+        checked={d.is_done}
+        disabled={busy}
+        aria-label={
+          (d.is_done ? "Tandai belum selesai " : "Selesaikan ") + d.title
+        }
+        onChange={(e) =>
+          run(
+            save(
+              "daily_tasks",
+              {
+                title: d.title,
+                due_date: d.due_date,
+                is_done: e.target.checked,
+              },
+              d.id,
+            ),
+          )
+        }
+      />
+      <div className="task-content">
+        <strong>{d.title}</strong>
+      </div>
+      {d.due_date && (
+        <span className="task-due">
+          <Icon name="calendar" />
+          {label(d.due_date)}
+        </span>
+      )}
+      <button
+        className="text-button"
+        disabled={busy}
+        aria-label={"Hapus " + d.title}
+        onClick={() => run(save("daily_tasks", undefined, d.id, true))}
+      >
+        Hapus
+      </button>
+    </div>
+  );
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <h1>Harian</h1>
+          <p>Tugas ringan yang tidak perlu masuk ke mata kuliah atau Event.</p>
+        </div>
+      </div>
+      <form method="post" className="daily-add" onSubmit={add}>
+        <input
+          name="title"
+          placeholder="Tulis tugas, lalu tekan Enter"
+          aria-label="Judul tugas harian"
+          required
+          maxLength={200}
+        />
+        <input name="due" type="date" aria-label="Tanggal (opsional)" />
+        <button className="primary" disabled={busy}>
+          Tambah
+        </button>
+      </form>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {open.length ? (
+        <div className="task-list">{open.map(row)}</div>
+      ) : (
+        <Empty title="Belum ada tugas harian">
+          <p>Tambahkan satu di atas, misalnya &quot;Fotokopi KRS&quot;.</p>
+        </Empty>
+      )}
+      {done.length > 0 && (
+        <>
+          <div className="section-heading">
+            <h2>{done.length} selesai</h2>
+            <button
+              className="text-button"
+              onClick={() => setShowDone(!showDone)}
+            >
+              {showDone ? "Sembunyikan" : "Tampilkan"}
+            </button>
+          </div>
+          {showDone && <div className="task-list">{done.map(row)}</div>}
         </>
       )}
     </>
@@ -1848,9 +2045,17 @@ function CommitteeView() {
                       })
                     }
                   >
-                    <span className="course-cover color-3">
-                      <Icon name="committee" />
-                    </span>
+                    {committeeLogo(e.name) ? (
+                      <img
+                        className="course-cover logo"
+                        src={committeeLogo(e.name)!}
+                        alt=""
+                      />
+                    ) : (
+                      <span className="course-cover color-3">
+                        <Icon name="committee" />
+                      </span>
+                    )}
                     <h2>{e.name}</h2>
                     <p>
                       {e.role || "Peran belum diisi"} · deadline{" "}
@@ -2215,17 +2420,27 @@ function CalendarView() {
 }
 function SettingsView() {
   const { data, save, busy } = useWorkspace(),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [student, setStudent] = useState(data.settings.udayana_student);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     const f = new FormData(e.currentTarget);
     try {
+      if (
+        student &&
+        !data.settings.udayana_student &&
+        !isHimaif(String(f.get("verify") || ""))
+      )
+        throw new Error("Jawaban pertanyaan verifikasi salah.");
       const value = settingsSchema.parse({
         name: String(f.get("name")),
         timezone: String(f.get("timezone")),
         academic_module_enabled: f.get("academic") === "on",
         committee_module_enabled: f.get("committee") === "on",
+        udayana_student: f.get("udayana") === "on",
+        semester:
+          f.get("udayana") === "on" ? Number(f.get("semester")) || null : null,
       });
       await save("settings", value);
     } catch (e) {
@@ -2278,6 +2493,46 @@ function SettingsView() {
           Gunakan nama zona IANA, misalnya Asia/Makassar. Mengubah zona waktu
           mengubah tampilan jam, bukan waktu deadline yang tersimpan.
         </p>
+        <h2>Status mahasiswa</h2>
+        <label className="toggle">
+          <input
+            name="udayana"
+            type="checkbox"
+            checked={student}
+            onChange={(e) => setStudent(e.target.checked)}
+          />
+          <span>
+            Mahasiswa aktif Informatika Universitas Udayana
+            <small>
+              Membuka daftar mata kuliah dan template kepanitiaan HIMA.
+            </small>
+          </span>
+        </label>
+        {student && !data.settings.udayana_student && (
+          <label>
+            {verifyQuestion}
+            <input name="verify" autoComplete="off" required />
+          </label>
+        )}
+        {student && (
+          <label>
+            Semester
+            <select
+              name="semester"
+              defaultValue={data.settings.semester ?? ""}
+              required
+            >
+              <option value="" disabled>
+                Pilih semester
+              </option>
+              {Array.from({ length: 14 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  Semester {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <h2>Modul</h2>
         <label className="toggle">
           <input
@@ -2313,8 +2568,8 @@ function SettingsView() {
       <section className="roadmap">
         <h2>Tahap berikutnya</h2>
         <p>
-          Login Google, Google Calendar, dan Gmail belum tersedia. Tidak ada
-          sinkronisasi atau pengiriman email melalui Gmail pada tahap ini.
+          Google Calendar dan Gmail belum tersedia. Tidak ada sinkronisasi atau
+          pengiriman email melalui Gmail pada tahap ini.
         </p>
         <Link href="/forgot-password">Pulihkan password akun</Link>
       </section>
@@ -2528,6 +2783,46 @@ function EditorDialog({
           <fieldset disabled={busy}>
             {editor.kind === "course" ? (
               <>
+                {data.settings.udayana_student && !course && (
+                  <label>
+                    Dari kurikulum Informatika Udayana (opsional)
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        const c = curriculum[Number(e.target.value)];
+                        if (!c) return;
+                        const form = e.target.form!;
+                        (
+                          form.elements.namedItem("name") as HTMLInputElement
+                        ).value = c.name;
+                        (
+                          form.elements.namedItem("credits") as HTMLInputElement
+                        ).value = String(c.credits);
+                      }}
+                    >
+                      <option value="">Isi manual</option>
+                      {[
+                        ...new Set([
+                          data.settings.semester,
+                          ...curriculumSemesters,
+                        ]),
+                      ]
+                        .filter((s) => s && curriculumSemesters.includes(s))
+                        .map((s) => (
+                          <optgroup key={s} label={"Semester " + s}>
+                            {curriculum.map(
+                              (c, i) =>
+                                c.semester === s && (
+                                  <option key={i} value={i}>
+                                    {c.name} ({c.credits} SKS)
+                                  </option>
+                                ),
+                            )}
+                          </optgroup>
+                        ))}
+                    </select>
+                  </label>
+                )}
                 <label>
                   Nama mata kuliah
                   <input
@@ -2598,11 +2893,31 @@ function EditorDialog({
                     Template checklist (opsional)
                     <select name="template" defaultValue="">
                       <option value="">Tanpa template</option>
-                      {Object.entries(eventTemplates).map(([key, t]) => (
-                        <option key={key} value={key}>
-                          {t.label} ({t.items.length} item)
-                        </option>
-                      ))}
+                      {Object.entries(eventTemplates)
+                        .filter(([, t]) => !t.group)
+                        .map(([key, t]) => (
+                          <option key={key} value={key}>
+                            {t.label} ({t.items.length} item)
+                          </option>
+                        ))}
+                      {data.settings.udayana_student &&
+                        [
+                          ...new Set(
+                            Object.values(eventTemplates).map((t) => t.group),
+                          ),
+                        ]
+                          .filter(Boolean)
+                          .map((g) => (
+                            <optgroup key={g} label={g}>
+                              {Object.entries(eventTemplates)
+                                .filter(([, t]) => t.group === g)
+                                .map(([key, t]) => (
+                                  <option key={key} value={key}>
+                                    {t.label} ({t.items.length} item)
+                                  </option>
+                                ))}
+                            </optgroup>
+                          ))}
                     </select>
                   </label>
                 )}

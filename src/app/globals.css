@@ -313,7 +313,13 @@ small {
   display: block;
   color: var(--muted);
   margin-top: 5px;
-  white-space: nowrap;
+  line-height: 1.5;
+}
+.workspace-identity > div {
+  min-width: 0;
+}
+.workspace-monogram {
+  flex-shrink: 0;
 }
 .workspace-label {
   font-size: 11px;
@@ -559,7 +565,8 @@ kbd {
   margin-bottom: 0;
   font-size: 13px;
 }
-.page-heading .primary {
+.page-heading .primary,
+.page-heading .secondary {
   font-size: 12px;
   min-height: 44px;
 }
@@ -841,6 +848,33 @@ kbd {
 .task-list {
   display: grid;
   padding: 0 22px;
+}
+.task-row.daily-row {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.task-row.daily-row .task-content {
+  flex: 1 1 auto;
+}
+.task-row.daily-row .task-check {
+  margin-top: 0;
+}
+.daily-add {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.daily-add input[name="title"] {
+  flex: 1;
+  min-width: 0;
+}
+.daily-add input[type="date"] {
+  width: auto;
+}
+@media (max-width: 640px) {
+  .daily-add {
+    flex-wrap: wrap;
+  }
 }
 .task-row {
   display: flex;
@@ -1268,6 +1302,10 @@ fieldset {
   display: grid;
   place-items: center;
   margin-bottom: 22px;
+}
+.course-cover.logo {
+  object-fit: cover;
+  display: block;
 }
 .course-cover svg {
   width: 23px;
@@ -2029,6 +2067,11 @@ dialog::backdrop {
   font-size: 13px;
   min-height: 45px;
   margin-top: 5px;
+}
+.auth-form .secondary {
+  font-size: 13px;
+  min-height: 45px;
+  margin-top: 12px;
 }
 .auth-links {
   display: grid;

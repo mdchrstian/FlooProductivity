@@ -31,6 +31,12 @@ export type ChecklistItem = {
   is_completed: boolean;
   position: number;
 };
+export type DailyTask = {
+  id: string;
+  title: string;
+  due_date: string | null;
+  is_done: boolean;
+};
 export type Note = {
   id: string;
   course_id: string | null;
@@ -63,6 +69,8 @@ export type Settings = {
   timezone: string;
   academic_module_enabled: boolean;
   committee_module_enabled: boolean;
+  udayana_student: boolean;
+  semester: number | null;
 };
 export type Workspace = {
   userId: string;
@@ -70,6 +78,7 @@ export type Workspace = {
   courses: Course[];
   tasks: Task[];
   notes: Note[];
+  daily: DailyTask[];
   sessions: PomodoroSession[];
   schedule: ScheduleItem[];
   events: CommitteeEvent[];

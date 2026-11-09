@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { WorkspaceView } from "@/components/workspace";
 const pages = [
   "dashboard",
+  "daily",
   "academic",
   "calendar",
   "settings",
