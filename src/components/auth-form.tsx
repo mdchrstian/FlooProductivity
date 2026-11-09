@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { browserClient } from "@/lib/supabase/browser";
+import { browserClient, signInWithGoogle } from "@/lib/supabase/browser";
 import { registrationSchema } from "@/lib/validation";
 import { isHimaif, verifyQuestion } from "@/lib/udayana";
 export default function AuthForm({
@@ -27,11 +27,8 @@ export default function AuthForm({
   };
   async function google() {
     setError("");
-    const { error } = await browserClient().auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin + "/auth/confirm" },
-    });
-    if (error) setError("Login Google belum dapat digunakan. Coba lagi nanti.");
+    if (await signInWithGoogle())
+      setError("Login Google belum dapat digunakan. Coba lagi nanti.");
   }
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

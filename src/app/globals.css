@@ -3122,3 +3122,233 @@ dialog::backdrop {
 .checklist-add input {
   flex: 1;
 }
+
+/* Landing page (public /) */
+.landing {
+  background: white;
+  min-height: 100vh;
+}
+.landing-bar,
+.landing main > section,
+.landing-footer {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-inline: 16px;
+}
+.landing-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 20px;
+}
+.landing .wordmark {
+  font-size: 32px;
+}
+.landing-login {
+  font-weight: 600;
+  color: var(--blue);
+}
+.landing-hero {
+  display: grid;
+  gap: 32px;
+  padding-block: 32px 56px;
+}
+.landing h1 {
+  font-size: 36px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.landing h2 {
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.landing h3 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.landing-hero-copy > p {
+  margin-top: 16px;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.landing-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+.landing-cta .primary,
+.landing-cta .secondary,
+.landing-final .primary {
+  min-height: 46px;
+}
+.landing .landing-small {
+  margin-top: 16px;
+  font-size: 13px;
+}
+.landing-small a,
+.landing-faq a {
+  color: var(--blue);
+  font-weight: 600;
+}
+.landing-error {
+  margin-top: 12px;
+  color: var(--error);
+}
+.landing-shot {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.landing main > .landing-section,
+.landing main > .landing-final {
+  padding-block: 40px;
+}
+.landing-features {
+  display: grid;
+  gap: 48px;
+  margin-top: 32px;
+}
+.landing-features article {
+  display: grid;
+  gap: 20px;
+  align-items: center;
+}
+.landing-features p {
+  margin-top: 8px;
+  max-width: 46ch;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.landing-icon {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 12px;
+  color: var(--blue);
+}
+.landing-udayana {
+  background: var(--pale);
+  border-radius: var(--radius);
+}
+.landing-udayana p {
+  margin-top: 12px;
+  max-width: 62ch;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.landing-steps {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.landing-steps li {
+  counter-increment: step;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.landing-steps li::before {
+  content: counter(step);
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--pale);
+  color: var(--blue);
+  font-weight: 700;
+}
+.landing-faq {
+  margin-top: 24px;
+  max-width: 720px;
+}
+.landing-faq details {
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+}
+.landing-faq summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.landing-faq p {
+  margin-top: 8px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.landing-final {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+.landing-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+  padding-block: 32px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+.landing-footer nav {
+  display: flex;
+  gap: 16px;
+  margin-right: auto;
+}
+.landing-footer a {
+  color: var(--muted);
+}
+.landing-footer .wordmark {
+  font-size: 24px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing .primary,
+  .landing .secondary {
+    transition: background-color 0.15s;
+  }
+}
+@media (min-width: 960px) {
+  .landing-bar,
+  .landing main > section,
+  .landing-footer {
+    padding-inline: 32px;
+  }
+  .landing h1 {
+    font-size: 52px;
+  }
+  .landing h2 {
+    font-size: 32px;
+  }
+  .landing-hero {
+    grid-template-columns: 5fr 6fr;
+    align-items: center;
+    gap: 48px;
+    padding-block: 56px 80px;
+  }
+  .landing-features article {
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+  }
+  .landing-features article:nth-child(even) > div {
+    order: 2;
+  }
+  .landing main > .landing-udayana {
+    padding: 48px;
+  }
+}

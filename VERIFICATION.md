@@ -102,3 +102,10 @@ Status: migration `202611130001_udayana.sql` sudah diterapkan ke hosted (SQL Edi
 - Lulus di browser (akun Uji A, data "Uji" dihapus): tambah dengan dan tanpa tanggal, label "Hari ini" dan "Terlambat", centang memindahkan ke "N selesai" dan tersimpan, hapus, tampilan desktop dan sempit.
 - Lulus: `tsc`, 18 unit test (skema harian).
 - Belum diuji: isolasi akun B untuk `daily_tasks` (tidak ada di `test-integration.ts`), edit judul (hanya tambah, centang, hapus). Tugas harian belum tampil di Dashboard, Kalender, atau pencarian.
+
+## Landing page (`/`)
+- `/` untuk pengunjung yang belum masuk menampilkan landing (hero, 4 fitur, blok Informatika Udayana, cara mulai, FAQ, footer); pengguna yang sudah masuk diarahkan ke `/dashboard`. `/login` dan `/register` tidak berubah. Pemanggilan `signInWithOAuth` dipindah ke `signInWithGoogle()` (`src/lib/supabase/browser.ts`) dan dipakai form login serta tombol landing.
+- Lulus: `tsc --noEmit`, `npm test` (18), prettier, `next build --webpack`. Browser (build produksi, belum masuk): lebar 1280 dan 390 px tanpa overflow horizontal, gambar termuat, tombol aktif setelah hydration. Tombol "Masuk dengan Google" diklik sekali dan berujung dengan sesi masuk (akun Google pemilik, tidak dibaca lebih jauh).
+- Gambar `public/landing/*.jpg` ditangkap dari akun Uji A (800 px lebar, resolusi terbatas pane). Data berawalan "Uji" (7 tugas, 1 Event, 1 tugas Event) sudah dihapus; jumlah tugas akun kembali 6 aktif, 2 dari 8 selesai. Chip Event INVENTION/SUPREMASI disembunyikan dari tangkapan Kalender dan Kepanitiaan memakai Event "Uji" yang sudah dihapus.
+- Belum diuji: fokus keyboard dan `prefers-reduced-motion` secara visual (hanya lewat CSS), tampilan 768 px, layar <390 px, tema gelap (tidak ada).
+- Catatan: tangkapan masih menampilkan teks "Uji ..." pada tugas dan nama "Akun"; ganti dengan data yang lebih netral bila ingin lebih rapi. Server dev lokal harus dijalankan dengan `NEXT_PUBLIC_APP_URL=http://localhost:3000` agar simpan data tidak ditolak (`.env.local` menunjuk ke domain Vercel).
