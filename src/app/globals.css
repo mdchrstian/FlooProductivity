@@ -2967,18 +2967,37 @@ dialog::backdrop {
 }
 .focus-panel {
   display: grid;
-  gap: 20px;
+  gap: 28px;
   justify-items: center;
+  padding: 48px 24px 32px;
   margin-bottom: 32px;
 }
 .focus-time {
   font-size: 64px;
   font-weight: 700;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 .focus-panel .actions {
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+  width: 100%;
+  max-width: 640px;
+}
+.focus-panel .actions label {
+  margin-bottom: 0;
+}
+.focus-panel .actions select,
+.focus-panel .actions button {
+  width: 100%;
+  min-height: 43px;
+}
+@media (max-width: 700px) {
+  .focus-panel .actions {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+  }
 }
