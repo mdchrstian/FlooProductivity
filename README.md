@@ -4,15 +4,30 @@ FLOO adalah aplikasi produktivitas berbasis web untuk mahasiswa. Satu tempat unt
 
 ## Project By KELOMPOK PENERBANG ROKET
 
+Koordinator:
+- I Made Christian Kusuma Antika (NIM. 2508561051)
 Anggota:
 - Dimas Shakuntala Adi Pratama (NIM. 2508561047)
 - Ida Nyoman Satwika Chandra Astawa (NIM. 2508561061)
-- [Nama Anggota 3] (NIM. [NIM])
-- [Nama Anggota 4] (NIM. [NIM])
+- I Made Mahasurya Adiputera (NIM. 2508561052)
 
 ## Untuk Apa FLOO?
 
 Mahasiswa biasanya membagi urusan ke banyak tempat: tugas di chat, jadwal di kalender, catatan di aplikasi lain, panitia di grup lain. FLOO menyatukannya dalam satu workspace yang sederhana, gratis, dan bisa dibuka dari browser laptop maupun ponsel.
+
+## Tampilan
+
+| Dashboard | Mata Kuliah dan Tugas |
+| --- | --- |
+| ![Dashboard FLOO](public/landing/dashboard.jpg) | ![Mata kuliah FLOO](public/landing/mata-kuliah.jpg) |
+
+| Kalender | Kepanitiaan |
+| --- | --- |
+| ![Kalender FLOO](public/landing/kalender.jpg) | ![Kepanitiaan FLOO](public/landing/kepanitiaan.jpg) |
+
+| Pomodoro |
+| --- |
+| ![Pomodoro FLOO](public/landing/fokus.jpg) |
 
 ## Fitur untuk Pengguna
 
