@@ -19,7 +19,7 @@ npm run dev
 
 Buka [http://localhost:3000](http://localhost:3000). Pada checkout baru, jalankan \`npm ci\` lalu buat \`.env.local\` berdasarkan \`.env.example\`. Isi konfigurasi proyek Supabase milikmu; kredensial tidak disertakan dalam repositori. Node.js 26.4.0 dipakai pada pengujian di Mac ini.
 
-Untuk versi produksi lokal, hentikan dev server, jalankan \`npm run build\`, kemudian \`npm start\`. Dev dan start menggunakan port 3000; jangan jalankan bersamaan. Script memanggil CLI lewat Node agar nama folder yang mengandung titik dua tetap dapat digunakan.
+## Fitur Yang Kita Rancang
 
 **## Konfigurasi Supabase**
 
@@ -29,7 +29,7 @@ Pada proyek Supabase baru yang kosong, jalankan \`supabase/migrations/2026110300
 
 Callback mendukung PKCE dari template email hosted bawaan dan token_hash. Pengguna sudah mengonfirmasi satu registrasi melalui email nyata berhasil sampai Dashboard. Pengiriman email pemulihan, SMTP khusus, dan penerima umum di luar batas layanan email bawaan belum terverifikasi.
 
-Konfigurasi Supabase lokal tetap tersedia sebagai alternatif: \`npm run supabase:start\`, \`npm run db:reset\`, lalu \`npm run configure:local\`. Ini membutuhkan container runtime dan ruang disk yang cukup. Stack lokal belum berhasil diuji karena disk Mac penuh; pengujian database menggunakan hosted atas pilihan pengguna. Jangan menjalankan \`db:reset\` sebagai langkah setup hosted.
+## Teknologi yang digunakan
 
 **## Fitur P0**
 
