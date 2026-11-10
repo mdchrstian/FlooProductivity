@@ -6,7 +6,7 @@ Fondasi fungsional P0 untuk produktivitas mahasiswa. Next.js App Router, TypeScr
 
 Anggota:
 - Dimas Shakuntala Adi Pratama (NIM. 2508561047)
--
+- Ida Nyoman Satwika Chandra Astawa (NIM. 2508561061)
 -
 -
 
