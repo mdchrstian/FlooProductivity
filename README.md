@@ -1,87 +1,103 @@
-**# FLOO: Productivity App**
+# FLOO: Productivity App
 
-Fondasi fungsional P0 untuk produktivitas mahasiswa. Next.js App Router, TypeScript, dan Supabase hosted. Tampilan mempertahankan karakter putih-biru prototipe FLOO. Situs publik lama tidak diperbarui.
+FLOO adalah aplikasi produktivitas berbasis web untuk mahasiswa. Satu tempat untuk mengatur mata kuliah, tugas, jadwal, catatan, sesi fokus, dan kepanitiaan, supaya deadline tidak terlewat dan kegiatan kuliah serta organisasi tidak saling bertabrakan.
 
-# Project By KELOMPOK PENERBANG ROKET
+## Project By KELOMPOK PENERBANG ROKET
 
 Anggota:
 - Dimas Shakuntala Adi Pratama (NIM. 2508561047)
-<<<<<<< HEAD
 - Ida Nyoman Satwika Chandra Astawa (NIM. 2508561061)
--
--
-=======
-- 
-- 
-- 
->>>>>>> 72945da (update readme)
+- [Nama Anggota 3] (NIM. [NIM])
+- [Nama Anggota 4] (NIM. [NIM])
 
-**## Menjalankan**
+## Untuk Apa FLOO?
 
-\`\`\`sh
-cd FlooProductivity
+Mahasiswa biasanya membagi urusan ke banyak tempat: tugas di chat, jadwal di kalender, catatan di aplikasi lain, panitia di grup lain. FLOO menyatukannya dalam satu workspace yang sederhana, gratis, dan bisa dibuka dari browser laptop maupun ponsel.
+
+## Fitur untuk Pengguna
+
+**Akun**
+- Daftar dengan email dan password (dengan verifikasi email) atau masuk langsung dengan akun Google.
+- Lupa password? Pulihkan lewat email.
+- Data tersimpan di akunmu dan hanya bisa dibuka lewat akun itu.
+
+**Dashboard**
+- Ringkasan tugas, agenda pekan ini, progres, dan pintasan ke mata kuliah.
+- Filter tugas berdasarkan status atau prioritas.
+
+**Mata Kuliah dan Tugas**
+- Tambah, ubah, dan hapus mata kuliah. Mata kuliah yang masih punya tugas tidak bisa dihapus, jadi tugasmu tidak hilang tanpa sengaja.
+- Tugas punya status (todo, in progress, done), prioritas, dan deadline wajib, tampil sebagai papan Kanban atau daftar.
+- Mahasiswa Informatika Udayana bisa memakai daftar mata kuliah semester 1-4 yang sudah tersedia.
+
+**Kalender**
+- Kalender bulanan yang menggabungkan deadline semua mata kuliah, plus agenda harian.
+- Waktu mengikuti zona waktu yang kamu atur di profil.
+
+**Catatan**
+- Catatan per mata kuliah.
+
+**Pomodoro**
+- Timer fokus dengan riwayat sesi.
+
+**Kepanitiaan**
+- Buat Event, isi checklist dari template (seminar, lomba, bakti sosial, dan template HIMA), lalu kerjakan tugas panitia berdampingan dengan tugas kuliah.
+
+**Pencarian cepat dan Pengaturan**
+- Cari tugas, mata kuliah, dan catatan dengan `Cmd/Ctrl+K`.
+- Atur nama, zona waktu, semester, serta tampilkan atau sembunyikan modul Akademik dan Kepanitiaan. Menyembunyikan modul tidak menghapus datamu.
+
+**Belum tersedia**
+Sinkronisasi Google Calendar, integrasi Gmail, notifikasi, dan aplikasi mobile native.
+
+## Sisi Development (Ringkas)
+
+| Bagian | Teknologi |
+| --- | --- |
+| Framework | Next.js (App Router), React, TypeScript |
+| Backend & Auth | Supabase (Postgres, Auth, Row Level Security) |
+| Validasi | Zod |
+| Waktu | Luxon (deadline disimpan sebagai `timestamptz`) |
+| Pengujian | `node:test` lewat tsx, plus pengujian integrasi ke Supabase |
+
+Cara kerja singkat:
+- Halaman dan API route ada di `src/app`. Tiap mutasi divalidasi dengan Zod di server sebelum disimpan.
+- Data diambil sebagai satu snapshot dan dibagikan lewat React Context. Tampilan baru diperbarui setelah server memastikan data tersimpan.
+- Keamanan data diatur di database: setiap tabel memakai RLS sehingga akun hanya bisa membaca dan mengubah datanya sendiri. Aplikasi hanya memakai publishable key, tanpa `service_role`.
+
+Struktur folder:
+- `src/app`: halaman, callback autentikasi, dan API
+- `src/components`: workspace, form autentikasi, landing, dan ikon
+- `src/lib`: validasi, waktu, tipe, template, dan klien Supabase
+- `supabase`: migrasi SQL (RLS dan constraint) serta template email
+- `docs`: panduan konfigurasi Supabase hosted
+- `legacy/frontend`: prototipe awal, bukan bagian alur aplikasi
+
+## Menjalankan Secara Lokal
+
+```sh
+npm ci
+cp .env.example .env.local
 npm run dev
-\`\`\`
+```
 
-Buka [http://localhost:3000](http://localhost:3000). Pada checkout baru, jalankan \`npm ci\` lalu buat \`.env.local\` berdasarkan \`.env.example\`. Isi konfigurasi proyek Supabase milikmu; kredensial tidak disertakan dalam repositori. Node.js 26.4.0 dipakai pada pengujian di Mac ini.
+Isi `.env.local` dengan URL proyek Supabase, publishable key, dan `NEXT_PUBLIC_APP_URL=http://localhost:3000`. Jangan commit `.env.local`.
 
-## Fitur Yang Kita Rancang
+Pada proyek Supabase yang baru, jalankan seluruh berkas di `supabase/migrations` berurutan lewat SQL Editor, lalu atur autentikasi (email, Google, redirect URL) sesuai [panduan Supabase hosted](docs/SETUP_SUPABASE_HOSTED.md).
 
-**## Konfigurasi Supabase**
+Buka [http://localhost:3000](http://localhost:3000).
 
-Isi URL proyek, **\*\*publishable key\*\***, dan \`NEXT_PUBLIC_APP_URL=[http://localhost:3000](http://localhost:3000)\`. Aplikasi tidak memerlukan secret key atau service_role. Jangan commit \`.env.local\`.
+## Pengujian
 
-Pada proyek Supabase baru yang kosong, jalankan \`supabase/migrations/202611030001_p0.sql\` sekali melalui SQL Editor. Konfigurasikan email/password, konfirmasi email, Site URL localhost, serta dua callback yang tercantum di [panduan hosted]\(docs/SETUP_SUPABASE_HOSTED.md).
-
-Callback mendukung PKCE dari template email hosted bawaan dan token_hash. Pengguna sudah mengonfirmasi satu registrasi melalui email nyata berhasil sampai Dashboard. Pengiriman email pemulihan, SMTP khusus, dan penerima umum di luar batas layanan email bawaan belum terverifikasi.
-
-## Teknologi yang digunakan
-
-**## Fitur P0**
-
-\- Registrasi, verifikasi email, login, logout, dan form pemulihan password, dengan sesi cookie dan pemeriksaan autentikasi server.
-\- CRUD mata kuliah. Mata kuliah yang masih memiliki tugas tidak dapat dihapus.
-\- CRUD Task, status Kanban todo/in_progress/done, checkbox selesai, prioritas, dan deadline wajib. Status dapat diubah tanpa drag-and-drop.
-\- Dashboard dengan ringkasan, agenda pekanan, filter tugas, progres nyata, dan pintasan mata kuliah.
-\- Kalender bulanan lintas mata kuliah dan agenda harian. Item desktop membuka detail; mobile menampilkan jumlah tugas dan agenda yang dapat dibuka.
-\- Pengaturan nama, zona waktu IANA, dan visibilitas Modul Akademik. Menyembunyikan modul tidak menghapus data.
-\- Pencarian Task/Course melalui tombol atau Cmd/Ctrl+K, mengikuti data akun dan visibilitas modul.
-
-Data P0 disimpan per akun di Supabase, tanpa localStorage atau isian demo. Satu snapshot React Context dipakai bersama; mutasi memperbarui tampilan setelah server menyatakan penyimpanan berhasil. Deadline disimpan sebagai timestamptz dan ditampilkan dalam zona pengguna. Tanggal memakai waktu berjalan.
-
-Notes, Pomodoro, Kepanitiaan, login Google, Google Calendar, dan Gmail berstatus **\*\*Tahap berikutnya\*\***. Tidak ada sinkronisasi Google atau timer yang disimulasikan sebagai fitur aktif.
-
-**## Pengujian**
-
-\`\`\`sh
+```sh
 npm run typecheck
 npm test
 npm run build
 npm run test:integration
-node scripts/test-http.mjs
-\`\`\`
+```
 
-Pengujian integrasi memerlukan \`.test-accounts.json\` berisi dua akun khusus uji yang sudah dikonfirmasi, dengan bentuk \`{"a":{"email":"...","password":"..."},"b":{"email":"...","password":"..."}}\`. File ini diabaikan Git. Pengujian membuat dan membersihkan datanya sendiri menggunakan publishable key dan sesi tiap akun; RLS tetap berlaku. Jangan memakai akun berisi data penting. Pemeriksaan HTTP membutuhkan server di port 3000.
+Pengujian integrasi membutuhkan `.test-accounts.json` berisi dua akun khusus uji (diabaikan Git). Jangan memakai akun berisi data penting. Hasil dan keterbatasan pengujian ada di [VERIFICATION.md](VERIFICATION.md), catatan desain di [DESIGN.md](DESIGN.md).
 
-Ringkasan hasil aktual dan keterbatasan: [VERIFICATION.md]\(VERIFICATION.md). Log lengkap dan screenshot QA disimpan lokal serta diabaikan Git karena dapat memuat informasi akun. Akun baru memulai dengan data kosong.
+## Repositori
 
-**## Struktur dan kelanjutan**
-
-\- \`src/app\`: halaman, callback autentikasi, dan API.
-\- \`src/components\`: workspace, form autentikasi, dan ikon asli FLOO.
-\- \`src/lib\`: validasi Zod, waktu Luxon, tipe, dan klien Supabase.
-\- \`supabase\`: migrasi RLS, constraint, konfigurasi lokal, dan template email opsional.
-\- \`legacy/frontend\`: prototipe awal; data contoh/localStorage di sana bukan alur aplikasi P0.
-\- \`docs\`: panduan konfigurasi Supabase hosted. Laporan akademik, catatan revisi, serta bukti pengujian lokal diabaikan Git.
-
-[DESIGN.md]\(DESIGN.md) mencatat karakter visual yang dipulihkan. Deployment publik dan fitur roadmap tetap pekerjaan lanjutan.
-
-**## Berkas publik dan lokal**
-
-\`.gitignore\` mengecualikan laporan, referensi, aset laporan, screenshot/log QA, environment, akun/token uji, build, konfigurasi hosting mesin, dan berkas kunci. Panduan Supabase hosted di \`docs\` tetap disertakan. Berkas lokal tersebut tetap ada di mesin kerja. Jangan memakai \`git add -f\` untuk memasukkan berkas yang diabaikan.
-
-Repositori project: [https://github.com/mdchrstian/FlooProductivity](https://github.com/mdchrstian/FlooProductivity). Migrasi dan source P0 disiapkan untuk diunggah oleh pemilik repositori.
-
-**## Demo sementara dari luar jaringan**
-
-Untuk tunnel HTTPS sementara, isi \`SHARE_APP_URL\` dengan origin tunnel yang tepat lalu restart server produksi. Nilai ini hanya dibaca server; origin utama tetap berlaku. Tambahkan URL \`/auth/confirm\` dan \`/auth/confirm?next=/reset-password\` dari origin tersebut pada redirect allowlist Supabase. Hapus origin demo setelah tunnel dihentikan. Tautan tunnel bergantung pada Mac, server Next.js, dan proses tunnel yang tetap hidup.
+[https://github.com/mdchrstian/FlooProductivity](https://github.com/mdchrstian/FlooProductivity)
