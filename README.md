@@ -8,7 +8,7 @@
 
 Tugas kuliah ada di satu tempat, deadline kepanitiaan di grup chat, jadwal kelas di foto KRS, dan to-do kecil di kepala. FLOO mengumpulkan semuanya dalam satu ruang pribadi dengan satu kalender, jadi tidak ada deadline yang terlewat.
 
-## Fitur
+## Fitur Yang Kita Rancang
 
 | | |
 |---|---|
@@ -28,7 +28,7 @@ Aktifkan status mahasiswa Informatika Udayana saat daftar atau di Pengaturan, la
 - Mata kuliah semester 1–4 beserta SKS-nya bisa ditambahkan sekali klik.
 - Template jobdesc tiap Sie untuk kepanitiaan HIMA: INVENTION, WEBNAS, Informatika Mengajar, dan SUPREMASI XIX (34 Sie).
 
-## Teknologi
+## Teknologi yang digunakan
 
 - [Next.js](https://nextjs.org) 16 (App Router) dan React 19, TypeScript
 - [Supabase](https://supabase.com): Postgres dengan Row Level Security, autentikasi email dan Google
