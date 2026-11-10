@@ -2,6 +2,14 @@
 
 Fondasi fungsional P0 untuk produktivitas mahasiswa. Next.js App Router, TypeScript, dan Supabase hosted. Tampilan mempertahankan karakter putih-biru prototipe FLOO. Situs publik lama tidak diperbarui.
 
+# Project By KELOMPOK PENERBANG ROKET
+
+Anggota:
+- Dimas Shakuntala Adi Pratama (NIM. 2508561047)
+-
+-
+-
+
 **## Menjalankan**
 
 \`\`\`sh
